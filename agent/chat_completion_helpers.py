@@ -30,6 +30,7 @@ from agent.error_classifier import (
     FailoverReason, PROVIDER_STREAM_EMPTY_FRAME_ERROR_CODE, PROVIDER_STREAM_NON_JSON_ERROR_CODE,
     _extract_status_code)
 from agent.sdk_transform_bypass import bypass_chat_sdk_request_transform
+from agent.privacy_stream_identity import relay_stream_identity as _relay_stream_identity
 from agent.errors import EmptyStreamError
 from agent.chat_completion_local import _streams_llamacpp, stale_giveup
 from agent.chat_completion_headers import _chat_completion_capturing_headers
@@ -74,12 +75,10 @@ _FALLBACK_EXHAUSTED_COOLDOWN_S = 5.0
 # double traffic every attempt, while later turns re-arm automatically.
 _STREAM_5XX_PROBE_WINDOW_S = 60.0
 
-
 def _context_thread_target(callback):
     """Bind a no-argument thread target to the caller's ContextVars."""
     context = contextvars.copy_context()
     return lambda: context.run(callback)
-
 
 def _join_worker_for_relay_teardown(worker, *, label: str) -> None:
     """Bounded worker join before raising InterruptedError (#81521).
@@ -99,7 +98,6 @@ def _join_worker_for_relay_teardown(worker, *, label: str) -> None:
     if worker.is_alive():
         logger.warning("%s worker still alive after interrupt abort (2.0s join "
             "timeout); Relay teardown will best-effort drain orphaned scopes (#81521).", label)
-
 
 def _ra():
     """Lazy ``run_agent`` reference so ``patch("run_agent.cleanup_vm")`` etc. intercept."""
@@ -765,6 +763,7 @@ def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client):
     so callers can register it with their abort/close machinery; bedrock / MoA
     manage their own clients. Interrupt/abort/close semantics stay in callers.
     """
+    from agent.privacy_guard import check_agent_transport; check_agent_transport(agent)
     if agent.api_mode == "codex_responses":
         return agent._run_codex_stream(api_kwargs, client=make_client("codex_stream_request"),
             on_first_delta=getattr(agent, "_codex_on_first_delta", None))
@@ -789,6 +788,8 @@ def _dispatch_nonstreaming_api_request(agent, api_kwargs: dict, *, make_client):
     # #93650: keep the bulk wire-format payload out of the SDK's GIL-holding
     # request transform. No-op unless this really is the OpenAI SDK, so the
     # MoA facade above and the suite's stand-in clients are unaffected.
+    from agent.privacy_guard import protect_request
+    api_kwargs = protect_request(api_kwargs, client=request_client, session_id=agent.session_id or '')
     api_kwargs = bypass_chat_sdk_request_transform(api_kwargs, request_client)
     return _chat_completion_capturing_headers(agent, request_client, api_kwargs)
 
@@ -1566,7 +1567,7 @@ def _assistant_reasoning_text(agent, assistant_message) -> Optional[str]:
     # stream (structured deltas or <think> tag extraction); fire only for
     # non-streaming modes (gateway, batch, quiet). Anything not shown during
     # streaming is caught by the CLI post-response fallback.
-    if reasoning_text and agent.reasoning_callback and not agent.stream_delta_callback and not agent._stream_callback:
+    if reasoning_text and not getattr(agent, '_hold_stream', False) and agent.reasoning_callback and not agent.stream_delta_callback and not agent._stream_callback:
         with contextlib.suppress(Exception):
             agent.reasoning_callback(reasoning_text)
     return _sanitize_surrogates(reasoning_text) if reasoning_text else reasoning_text
@@ -2286,6 +2287,7 @@ def handle_max_iterations(agent, messages: list, api_call_count: int) -> str:
     else:
         agent._safe_print(warning, diagnostic=True)
 
+    from agent.privacy_guard import check_agent_transport; check_agent_transport(agent)
     summary_api_request_id = f"iteration-summary:{uuid.uuid4()}"
     summary_call_outcome = "failed"
 
@@ -2456,11 +2458,6 @@ def _is_sse_connection_error(exc: BaseException) -> bool:
     return any(phrase in err_lower for phrase in _SSE_CONN_PHRASES)
 
 
-def _relay_stream_identity(agent, name_default: str) -> dict:
-    """``session_id``/``name``/``model_name`` kwargs for ``relay_llm.stream``."""
-    return {"session_id": str(getattr(agent, "session_id", "") or ""),
-        "name": str(getattr(agent, "provider", "") or name_default),
-        "model_name": str(getattr(agent, "model", "") or "")}
 
 
 def _relay_stream_metadata(agent, api_mode: str) -> dict:
@@ -2951,6 +2948,8 @@ class _StreamingCall(StreamingWaitMonitor):
         self.agent._touch_activity("waiting for provider response (streaming)")
         # #93650: as above — the streaming path carries the same bulk
         # messages/tools payload and pays the same client-side walk.
+        from agent.privacy_guard import protect_request
+        stream_kwargs = protect_request(stream_kwargs, client=request_client, session_id=self.agent.session_id or '')
         stream_kwargs = bypass_chat_sdk_request_transform(stream_kwargs, request_client)
         return request_client.chat.completions.create(**stream_kwargs)
 
@@ -3397,8 +3396,8 @@ class _StreamingCall(StreamingWaitMonitor):
         accumulator = relay_llm.AnthropicStreamAccumulator()
 
         def _open_anthropic_stream(next_api_kwargs: dict[str, Any]):
-            final_kwargs = dict(next_api_kwargs)
-            sanitize_anthropic_kwargs(final_kwargs, log_prefix=getattr(self.agent, "log_prefix", ""))
+            from agent.privacy_guard import prepare_anthropic_stream
+            final_kwargs = prepare_anthropic_stream(next_api_kwargs, self.agent)
             manager = request_client.messages.stream(**final_kwargs)
             _stream_context["manager"] = manager
             return normalize_stream_usage(manager.__enter__())
@@ -3710,6 +3709,7 @@ class _StreamingCall(StreamingWaitMonitor):
         return True
 
     def _call_wire(self, stream_attempt_id: int):
+        from agent.privacy_guard import check_agent_transport; check_agent_transport(self.agent)
         if self.agent.api_mode != "anthropic_messages":
             return self._call_chat_completions(stream_attempt_id)
         # Per-request client so the watchdog aborts its socket, not the shared one.

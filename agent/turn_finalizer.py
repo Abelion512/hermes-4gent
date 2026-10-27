@@ -555,6 +555,9 @@ def _run_held_transforms(callbacks, payload: dict, logger) -> Optional[str]:
     fixed notice, never the text the plugin had to see first."""
     from hermes_cli.plugins import get_plugin_manager
 
+    from agent.privacy_guard import transform_required_output
+    if callbacks == (transform_required_output,):
+        return transform_required_output(**payload)
     try:
         rewrite, failed = get_plugin_manager().run_held_transforms(callbacks, **payload)
     except Exception:  # fail closed: whatever broke dispatch, the original stays withheld

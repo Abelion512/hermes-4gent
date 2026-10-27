@@ -430,8 +430,13 @@ def openrouter_asker(api_key: Optional[str] = None, model: str = OPENROUTER_JEV_
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY is not configured")
 
+    import uuid
+    privacy_session = 'jev-' + uuid.uuid4().hex
+
     def ask(state, questions):
-        body = json.dumps({"model": model, "state": state, "questions": questions}).encode()
+        from agent.privacy_guard import protect_native_request
+        payload = protect_native_request({'model': model, 'state': state, 'questions': questions}, transport='systemone', session_id=privacy_session)
+        body = json.dumps(payload).encode()
         req = urllib.request.Request(url, data=body, headers={
             "Authorization": f"Bearer {key}", "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/NousResearch/hermes-agent", "X-Title": "hermes compaction eval",
@@ -440,6 +445,9 @@ def openrouter_asker(api_key: Optional[str] = None, model: str = OPENROUTER_JEV_
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:  # pragma: no cover - network
+            from agent.privacy_guard import required
+            if required():
+                raise RuntimeError(f'Jev request failed ({e.code}); response withheld') from None
             raise RuntimeError(f"Jev request failed ({e.code}): {e.read().decode()[:200]}") from e
 
     return ask

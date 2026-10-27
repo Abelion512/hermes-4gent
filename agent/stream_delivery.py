@@ -372,6 +372,8 @@ class StreamDeliveryMixin:
 
         ``inline`` marks text recovered from ``<think>`` blocks in content; any other call is a native
         provider reasoning delta and stops inline forwarding for the rest of this model response."""
+        if getattr(self, '_hold_stream', False):
+            return
         if not inline:
             self._native_reasoning_streamed = True
         if self._stream_writer_superseded():

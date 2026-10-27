@@ -65,7 +65,6 @@ from hermes_cli.plugins_state import (
     _plugin_relative_segments, _plugin_settings_entry, save_plugin_setting,
 )
 
-
 def get_bundled_plugins_dir() -> Path:
     """Bundled ``plugins/`` dir: ``HERMES_BUNDLED_PLUGINS`` (Nix wrapper / packaged installs, read-only
     store paths) first, else the in-repo path."""
@@ -73,7 +72,6 @@ def get_bundled_plugins_dir() -> Path:
     if env_override:
         return Path(env_override)
     return Path(__file__).resolve().parent.parent / "plugins"
-
 
 class PluginToolOverrideError(PermissionError):
     """Plugin tried to override a built-in tool without ``plugins.entries.<id>.allow_tool_override``."""
@@ -939,9 +937,13 @@ class PluginContext(PluginCapabilityCtxMixin):
     def register_middleware(self, kind: str, callback: Callable) -> PluginRegistration:
         """Register behavior-changing middleware (request kinds rewrite the payload, execution kinds
         wrap the callback). Unknown kinds warn but are stored."""
-        return self._track_callback(
+        handle = self._track_callback(
             "middleware", kind, callback, self._manager._middleware, VALID_MIDDLEWARE
         )
+        if kind == 'llm_privacy':
+            from agent.privacy_guard import register_owner
+            register_owner(self, callback)
+        return handle
 
     def _track_callback(
         self, kind: str, key: str, callback: Callable, mapping: dict[str, list[Callable]],
@@ -1096,15 +1098,12 @@ class PluginManager(PluginLoaderMixin, PluginDispatchMixin, PluginLedgerMixin):
         # messaging gateway and a TUI in one process would otherwise clobber each other.
         self._tui_message_injector: tuple[object, Callable] | None = None
         self._context_engine = None  # Set by a plugin via register_context_engine()
-        # Manager-local registries keyed by name (see the matching ``PluginContext.register_*``):
-        # plugins, hooks, middleware, CLI + slash commands, prompt sections, skills (qualified name ->
-        # metadata), portable MCP servers, auxiliary tasks, approval transports, Slack action handlers
-        # (matcher, callback, plugin_name), platform handler factories (lowercase platform -> list).
         self._plugins: dict[str, LoadedPlugin] = {}
         self._hooks: dict[str, list[Callable]] = {}
         # Fallback hooks registered by a memory provider before general discovery.
         self._memory_hook_registrations: dict[tuple[str, str], list[PluginRegistration]] = {}
         self._middleware: dict[str, list[Callable]] = {}
+        self._privacy_policy_owners: dict[str, str] = {}
         self._plugin_tool_names: set[str] = set()
         self._plugin_platform_names: set[str] = set()
         self._cli_commands: dict[str, dict] = {}

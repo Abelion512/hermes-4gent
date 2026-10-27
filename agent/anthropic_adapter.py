@@ -868,6 +868,8 @@ def create_anthropic_message(
     ``on_response(httpx_response)`` exposes headers the parsed Message drops (Nous Portal's
     ``x-nous-credits-*`` balance family)."""
     sanitize_anthropic_kwargs(api_kwargs, log_prefix=log_prefix)
+    from agent.privacy_guard import protect_native_request
+    api_kwargs = protect_native_request(api_kwargs, transport='anthropic_messages')
     messages_api = getattr(client, "messages", None)
     stream_fn = getattr(messages_api, "stream", None)
     if prefer_stream and callable(stream_fn):

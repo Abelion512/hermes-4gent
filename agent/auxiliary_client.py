@@ -44,6 +44,7 @@ from agent.codex_headers import (
 )
 from agent.codex_runtime import _codex_event_has_content
 from agent.sdk_transform_bypass import bypass_chat_sdk_request_transform
+from agent.auxiliary_stream_plan import stream_request_plan as _stream_request_plan
 
 # `openai.OpenAI` is imported lazily (~240 ms cold); `OpenAI` below is a proxy
 # so in-module calls, `auxiliary_client.OpenAI` reads and
@@ -2638,7 +2639,8 @@ def _relay_sync_completion(
     relay_context = _RELAY_AUX_CALL_CONTEXT.get() or {}
     task = relay_context.get("task")
     relay_context["stream_provider"] = provider or relay_context.get("provider")
-    callback = create or (lambda request: _create_with_progress(client, request, task))
+    from agent.privacy_guard import guard_sync_callback
+    callback = guard_sync_callback(client, create or (lambda request: _create_with_progress(client, request, task)))
     route = _relay_auxiliary_metadata(provider=provider, api_mode=api_mode)
     # Isolate only the provider callback so the owning thread can unwind its lease/DB
     # transaction on hard cancel without touching the shared client.
@@ -2671,7 +2673,8 @@ async def _relay_async_completion(
 
     kwargs = prepare_chat_messages(client, kwargs)
     # Async twin of the seam default above (#98466).
-    callback = create or (lambda request: _acreate_with_progress(client, request))
+    from agent.privacy_guard import guard_async_callback
+    callback = guard_async_callback(client, create or (lambda request: _acreate_with_progress(client, request)))
     route = _relay_auxiliary_metadata(provider=provider, api_mode=api_mode)
     if route is None:
         return await callback(kwargs)
@@ -2701,7 +2704,8 @@ def _relay_sync_stream(
     kwargs = prepare_chat_messages(client, kwargs)
     # The bypass runs inside the provider callback, AFTER Relay has seen (and possibly
     # rewritten) the real conversation; applying it to `kwargs` would hand Relay an empty one.
-    create = lambda request: client.chat.completions.create(**bypass_chat_sdk_request_transform(request, client))
+    from agent.privacy_guard import protect_request
+    create = lambda request: client.chat.completions.create(**bypass_chat_sdk_request_transform(protect_request(request, client=client), client))
     route = _relay_auxiliary_metadata(provider=provider, api_mode=api_mode)
     if route is None:
         return create(kwargs)
@@ -7062,17 +7066,6 @@ def _create_with_progress(
         return _create_with_progress_once(client, retry_kwargs, task, force_stream=force_stream)
 
 
-def _stream_request_plan(kwargs: dict[str, Any], client: Any = None) -> tuple[dict[str, Any], str, float]:
-    """(stream kwargs, model name, total ceiling) for a streamed re-aggregation. Requests to the
-    managed llama-server also ask for prompt-reading progress, which keeps the watchdogs fed
-    through a long prefill."""
-    stream_kwargs = dict(kwargs)
-    stream_kwargs["stream"] = True
-    stream_kwargs["stream_options"] = {"include_usage": True}
-    if _is_managed_local_endpoint(str(getattr(client, "base_url", "") or "")):
-        stream_kwargs = with_prompt_progress(stream_kwargs)
-    return (stream_kwargs, str(kwargs.get("model") or ""),
-            _aux_stream_total_ceiling(kwargs.get("timeout")))
 
 
 def _create_with_progress_once(
@@ -8161,6 +8154,8 @@ def _call_llm_impl(
         if task == "moa_aggregator" and isinstance(client, CodexAuxiliaryClient):
             # Responses-shim clients consume the stream internally and return a completed
             # object Relay's managed stream would iterate; the MoA facade wraps it as one chunk.
+            from agent.privacy_guard import protect_request
+            kwargs = protect_request(kwargs, client=client)
             return client.chat.completions.create(**kwargs)
         return _relay_sync_stream(client, kwargs, provider=request_provider, api_mode=req.resolved_api_mode)
 

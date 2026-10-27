@@ -715,6 +715,14 @@ def _dispatch_authorized_once(
         resolve = lambda: _pre_tool_block(agent, ref)
         block_message, ref.args = resolve() if authorization_gate is None else authorization_gate.run(resolve)
         state.args = ref.args
+    if block_message is None:
+        from agent.privacy_guard import protect_tool, PrivacyGuardDenied
+        try:
+            ref.args = protect_tool(ref.name, ref.args, session_id=agent.session_id or '')
+            state.args = ref.args
+        except PrivacyGuardDenied:
+            block_message = 'Required local privacy policy denied this tool call'
+            block_error_type = 'privacy_guard_denied'
     block_body = None if block_message is None else {"error": block_message}
 
     # Checked once, after plugin modify hooks (which may replace arguments) and

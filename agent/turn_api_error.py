@@ -71,6 +71,14 @@ def handle_api_error(
             _provider_overflow_recovery_pending=_provider_overflow_recovery_pending, result=result,
         )
 
+    from agent.privacy_guard import PrivacyGuardDenied
+    if isinstance(api_error, PrivacyGuardDenied):
+        # A local refusal is not a provider outage: never retry/fallback a policy denial.
+        return _verdict('return', {
+            'final_response': str(api_error), 'error': 'privacy_guard_denied',
+            'failed': True, 'messages': messages, 'completed': False,
+        })
+
     # Stop spinner silently — retry status is buffered and only flushed when every
     # retry+fallback is exhausted.
     if thinking_spinner:

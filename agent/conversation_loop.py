@@ -1652,7 +1652,8 @@ def _run_conversation_turn(
     # A loaded ``hold_stream`` transform in this profile: the user sees only its rewritten final, made
     # by the transforms live now (a plugin reload mid-turn cannot drop them before the final). Set
     # before any exit, so an early one never reads the previous turn's hold.
-    agent._held_transforms = held_stream_transforms()
+    from agent.privacy_guard import required, transform_required_output
+    agent._held_transforms = ((transform_required_output,) if required() else held_stream_transforms())
     agent._hold_stream = bool(agent._held_transforms)
 
     # Per-turn setup: build_turn_context mutates ``agent`` and returns the locals the loop reads.

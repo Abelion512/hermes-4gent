@@ -45,3 +45,7 @@ def _fast_retry_backoff(request, monkeypatch):
     # server-error retries don't burn real wall-clock seconds.
     from agent import retry_utils as _retry_utils
     monkeypatch.setattr(_retry_utils, "jittered_backoff", lambda *a, **k: 0.0)
+
+
+def pytest_addoption(parser):
+    parser.addini("privacy_plugin_root", "Optional public checkout for required-privacy integration tests", default="")

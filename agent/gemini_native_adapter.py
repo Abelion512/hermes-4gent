@@ -932,7 +932,8 @@ class GeminiNativeClient:
             response_format=response_format or extra.get("response_format"), model=model,
             tools_as_json_schema=gemini_accepts_parameters_json_schema(self.base_url),
         )
-        model = bare_gemini_model_id(model)
+        from agent.privacy_guard import protect_model_control
+        model = bare_gemini_model_id(protect_model_control(model, session_id=self._privacy_session()))
         url = f"{self.base_url}/models/{model}:"
         if stream:
             return self._stream_completion(model, f"{url}{self.STREAM_METHOD}?alt=sse", request, timeout)
@@ -944,7 +945,15 @@ class GeminiNativeClient:
             hops.append(self._generate(url + self.GENERATE_METHOD, {**request, "continuationToken": token}, timeout))
         return translate_gemini_response(merge_hop_responses(hops) if len(hops) > 1 else hops[0], model=model)
 
+    def _privacy_session(self):
+        if not hasattr(self, '_privacy_session_id'):
+            import uuid
+            self._privacy_session_id = 'gemini-' + uuid.uuid4().hex
+        return self._privacy_session_id
+
     def _generate(self, url: str, request: dict[str, Any], timeout: Any) -> dict[str, Any]:
+        from agent.privacy_guard import protect_native_request
+        request = protect_native_request(request, transport='gemini_native', session_id=self._privacy_session())
         response = self._http.post(url, json=request, headers=self._headers(), timeout=timeout)
         if response.status_code != 200:
             raise self._http_error(response)
@@ -966,6 +975,8 @@ class GeminiNativeClient:
         while True:
             try:
                 headers = {**self._headers(), "Accept": "text/event-stream"}
+                from agent.privacy_guard import protect_native_request
+                body = protect_native_request(body, transport='gemini_native', session_id=self._privacy_session())
                 with self._http.stream("POST", url, json=body, headers=headers, timeout=timeout) as response:
                     if response.status_code != 200:
                         raise self._http_error(response, read_streaming_error_body(response))
