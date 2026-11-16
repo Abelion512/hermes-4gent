@@ -1,9 +1,17 @@
-# Regenerates docs/assets/pr-template-flow.png. Run from the repo root: python3 docs/flows/pr-template-flow.py
+# Regenerates docs/assets/pr-template-flow.png.
+# Needs Pillow (pip install pillow). Run from anywhere: python3 docs/flows/pr-template-flow.py
+import os
 from PIL import Image, ImageDraw, ImageFont
 W,H=1500,520
 im=Image.new("RGB",(W,H),"#0f1420"); d=ImageDraw.Draw(im)
-F="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"; FB="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-t=ImageFont.truetype(FB,34); b=ImageFont.truetype(FB,22); s=ImageFont.truetype(F,19)
+def font(names,size):
+    for n in names:
+        try: return ImageFont.truetype(n,size)
+        except OSError: pass
+    return ImageFont.load_default(size)
+REG=["DejaVuSans.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","Arial.ttf","/System/Library/Fonts/Supplemental/Arial.ttf","C:/Windows/Fonts/arial.ttf"]
+BOLD=["DejaVuSans-Bold.ttf","/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","Arial Bold.ttf","/System/Library/Fonts/Supplemental/Arial Bold.ttf","C:/Windows/Fonts/arialbd.ttf"]
+t=font(BOLD,34); b=font(BOLD,22); s=font(REG,19)
 G="#9fb0cc"
 d.text((40,26),"How it works: the pull request template",font=t,fill="#ffffff")
 d.text((40,74),"The template fills the PR description for you. The image helps the reviewer see the change.",font=s,fill=G)
@@ -20,4 +28,5 @@ box(1150,140,310,150,"4. Review",["Review the picture","and the checks."],"#c3a6
 for a,b2 in ((340,400),(730,790),(1090,1150)): arrow(a,215,b2)
 d.text((40,340),"The template is applied to new PRs only after it is merged to the default branch.",font=s,fill=G)
 d.text((40,374),"Nothing here runs in CI, merges, or deploys.",font=s,fill=G)
-im.save("docs/assets/pr-template-flow.png")
+out=os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","assets","pr-template-flow.png")
+im.save(os.path.normpath(out))
