@@ -22,6 +22,7 @@ from agent.model_metadata_cache import _write_context_cache, locked_context_cach
 from agent.context_default_record import mark_context_defaulted, records_context_defaults
 from agent.model_metadata_llamacpp import llamacpp_context
 from agent.model_metadata_memo_bounds import MEMO_LOCK, bound_codex_caches, remember_endpoint_models as _remember_endpoint_models
+from agent.process_transport import is_local_server as _is_local_server
 from agent.model_metadata_memo_keys import endpoint_disk_slot as _endpoint_disk_slot, endpoint_memo_key as _endpoint_memo_key
 
 from utils import atomic_json_write, base_url_host_matches, base_url_hostname
@@ -32,6 +33,7 @@ from agent.replayed_reasoning import codex_reasoning_replay_tokens, strip_opaque
 from agent.model_metadata_token_memo import (  # _MSG_TOKENS_CACHE: tests and benches read it here
     _MSG_TOKENS_CACHE, MemoPins, lookup_message_tokens, remember_message_tokens,
 )
+from session_rules.turns import _IMAGE_PART_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -2051,7 +2053,7 @@ def _resolve_custom_endpoint_context_length(model: str, base_url: str, api_key: 
         return context_length
     # Local endpoints: the num_ctx-aware probe first — _query_ollama_api_show is GGUF-first, which
     # can be larger and create a false-safe compression window.
-    local_ctx = _probe_local_context_length(model, base_url, api_key, provider) if is_local_endpoint(base_url) else None
+    local_ctx = _probe_local_context_length(model, base_url, api_key, provider) if _is_local_server(base_url, provider) else None
     if local_ctx:
         return local_ctx
     # 2b. Ollama native /api/show (GGUF-first for non-local). Non-Ollama servers 404/405 quickly.
@@ -2307,9 +2309,8 @@ def get_model_context_length(
                 logger.info("Rejecting OpenRouter metadata context=%s for %r (known 32K underreport); falling through to hardcoded defaults", or_ctx, model)
             else:
                 return or_ctx
-    # 7. Local server before hardcoded defaults — ``Hermes-3-Llama-3.1-70B`` matches ``llama``
-    # (131072) even when vLLM runs at a lower ``--max-model-len``.
-    local_ctx = _probe_local_context_length(model, base_url, api_key, provider) if base_url and is_local_endpoint(base_url) else None
+    # 7. Local server before hardcoded defaults: vLLM's ``--max-model-len`` beats the ``llama`` 131072 row.
+    local_ctx = _probe_local_context_length(model, base_url, api_key, provider) if _is_local_server(base_url, provider) else None
     if local_ctx:
         return local_ctx
     # 8. Hardcoded defaults: `key in model` only — the reverse would let "claude-sonnet-4" match "claude-sonnet-4-6" and return 1M.
@@ -2471,9 +2472,6 @@ def _estimate_message_tokens_cached(msg: Any, image_cost: int) -> int:
 
 def _count_parts(parts: Any, types: set) -> int:
     return sum(1 for part in parts if isinstance(part, dict) and part.get("type") in types) if isinstance(parts, list) else 0
-
-
-_IMAGE_PART_TYPES = frozenset({"image", "image_url", "input_image"})
 
 
 def _count_image_tokens(msg: dict[str, Any], cost_per_image: int) -> int:
