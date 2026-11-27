@@ -527,6 +527,12 @@ export const paperTheme: DesktopTheme = {
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '--ui-bg-input:#FAF8F3;' +
+    '}' +
+    // Element-scoped composer rules ([data-slot=composer-root] and the
+    // data-hud-shell / dock hover-focus variants) redeclare --composer-fill
+    // from --dt-card and beat a :root declaration, so match those scopes
+    // directly; !important wins over the app's normal rules at any order.
+    '[data-slot="composer-root"],[data-hud-shell] [data-slot="composer-root"],[data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
     '}'
 }
