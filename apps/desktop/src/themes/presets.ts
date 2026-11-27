@@ -527,7 +527,7 @@ export const paperTheme: DesktopTheme = {
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '--ui-bg-input:#FAF8F3;' +
-    '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent);' +
+    '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
     '}'
 }
 
