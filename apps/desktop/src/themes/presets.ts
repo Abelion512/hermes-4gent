@@ -444,87 +444,111 @@ export const slateTheme: DesktopTheme = {
 /**
  * Paper - warm off-white paper with a terracotta accent, lifted from the
  * headphone-showdown reference page the user picked. Broad surfaces sit on the
- * paper tone so long sessions stay low-glare; every text pair is WCAG AA+.
+ * paper tone so long sessions stay low-glare; every text pair is WCAG AA+. Ships a dimmed light and a dark palette.
  * Tokens without a reference source are marked derived.
  */
 const PAPER_LIGHT_COLORS: DesktopThemeColors = {
-    background: '#F4F2ED',
-    foreground: '#191816',
-    card: '#FFFFFF',
-    cardForeground: '#191816',
-    muted: '#EDEAE2', // derived: one step darker than the paper tone
-    mutedForeground: '#6C6861',
-    popover: '#FFFFFF',
-    popoverForeground: '#191816',
-    primary: '#B4503A',
-    primaryForeground: '#FFFFFF', // derived: reference has no buttons
-    secondary: '#F8EBE5',
-    secondaryForeground: '#514D46',
-    accent: '#F8EBE5',
-    accentForeground: '#8B3C28',
-    border: '#E1DDD4',
-    input: '#E1DDD4',
-    ring: '#B4503A',
-    midground: '#B4503A',
-    destructive: '#8B3C28', // derived: dark accent doubles as the danger hue
-    destructiveForeground: '#FFFFFF',
-    sidebarBackground: '#EDEAE2', // derived: reference page has no sidebar
-    sidebarBorder: '#E1DDD4',
-    userBubble: '#F8EBE5', // derived: reference has no chat UI
-    userBubbleBorder: '#E7D3C8'
-  }
+  background: '#E9E6DE', // dimmed one step from the reference paper for low glare
+  foreground: '#191816',
+  card: '#F3F0EA',
+  cardForeground: '#191816',
+  muted: '#DFDCD3', // derived: one step darker than the paper tone
+  mutedForeground: '#5C5850',
+  popover: '#F3F0EA',
+  popoverForeground: '#191816',
+  primary: '#9C4A34',
+  primaryForeground: '#FFFFFF', // derived: reference has no buttons
+  secondary: '#EFE2D8',
+  secondaryForeground: '#514D46',
+  accent: '#EFE2D8',
+  accentForeground: '#8B3C28',
+  border: '#D6D1C5',
+  input: '#D6D1C5',
+  ring: '#9C4A34',
+  midground: '#9C4A34',
+  destructive: '#8B3C28', // derived: dark accent doubles as the danger hue
+  destructiveForeground: '#FFFFFF',
+  sidebarBackground: '#DFDCD3', // derived: reference page has no sidebar
+  sidebarBorder: '#D6D1C5',
+  userBubble: '#EFE2D8', // derived: reference has no chat UI
+  userBubbleBorder: '#DCC6B8'
+}
+
+/** Dark counterpart: same warm terracotta family on a dim brown-black canvas. */
+const PAPER_DARK_COLORS: DesktopThemeColors = {
+  background: '#1E1A17',
+  foreground: '#EDE6DC',
+  card: '#28221E',
+  cardForeground: '#EDE6DC',
+  muted: '#241F1B',
+  mutedForeground: '#A79D91',
+  popover: '#28221E',
+  popoverForeground: '#EDE6DC',
+  primary: '#D08A6F',
+  primaryForeground: '#241611',
+  secondary: '#3A2E27',
+  secondaryForeground: '#D8CFC2',
+  accent: '#3A2E27',
+  accentForeground: '#E0A487',
+  border: '#3D352E',
+  input: '#3D352E',
+  ring: '#D08A6F',
+  midground: '#D08A6F',
+  destructive: '#C56B52',
+  destructiveForeground: '#241611',
+  sidebarBackground: '#241F1B',
+  sidebarBorder: '#3D352E',
+  userBubble: '#3A2E27',
+  userBubbleBorder: '#4A3B31'
+}
 
 export const paperTheme: DesktopTheme = {
   name: 'paper',
   label: 'Paper',
   description: 'Warm paper and terracotta, low-glare for long sessions',
   colors: PAPER_LIGHT_COLORS,
-  // A light-only skin is painted through synthLightColors() (context.tsx
-  // paletteFor), which re-derives a near-white palette from the accent and
-  // discards the authored colors. Declaring darkColors marks this a
-  // both-modes skin so light paints `colors` exactly as authored.
   // Declaring darkColors marks this a both-modes skin so paletteFor never
-  // routes paper through synthLightColors(). It is the SAME authored warm
-  // palette, not a dark variant: paper paints the approved low-glare warm
-  // look identically in light and dark mode, so an OS dark-mode flip never
-  // changes what the user sees. (Hermes review F1 prescribed exactly this:
-  // darkColors: paperTheme.colors.)
-  darkColors: PAPER_LIGHT_COLORS,
+  // routes paper through synthLightColors(). Light mode paints the dimmed warm
+  // paper palette, dark mode paints the dim warm dark palette, chosen by the
+  // native Light / Dark / System mode control.
+  darkColors: PAPER_DARK_COLORS,
   typography: {
     fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
     fontMono: SYSTEM_MONO
   },
-  // The light-mode design defaults paint chat bubbles and text inputs
-  // near-white (mix-bubble 0% -> neutral-card #fcfcfc, --ui-bg-input literal)
-  // regardless of the skin's seeds. Paper's palette has warm tokens for both
-  // (userBubble #F8EBE5, a warm input tint derived from the paper tone), so
-  // claim the surfaces here. The composer backing layer resolves from
-  // --dt-card (white card seed mixed over #fcfcfc), so give it a warm fill a
-  // step above the paper canvas. Scoped to this skin: customCSS is injected
-  // only while paper is active, other themes keep the defaults.
+  // The design defaults paint chat bubbles, text inputs and elevated surfaces
+  // near-white regardless of the skin's seeds, so claim them here, per mode.
+  // Scoped to this skin: customCSS is injected only while paper is active.
   customCSS:
     ':root{' +
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
+    '}' +
+    'html:not(.dark){' +
     '--ui-bg-input:#FAF8F3;' +
-    // Elevated surfaces (menus, selects, dialogs, popovers, command
-    // palette, card utilities) all mix the white card seed over #fcfcfc;
-    // give the three derived tokens the same warm tint as the input.
     '--ui-bg-elevated:#FAF8F3 !important;' +
     '--dt-card:#FAF8F3 !important;' +
     '--dt-popover:color-mix(in srgb,#FAF8F3 96%,transparent) !important;' +
     '}' +
-    // Element-scoped composer rules ([data-slot=composer-root] and the
-    // data-hud-shell / dock hover-focus variants) redeclare --composer-fill
-    // from --dt-card and beat a :root declaration, so match those scopes
-    // directly; !important wins over the app's normal rules at any order.
-    '[data-slot="composer-root"],[data-hud-shell] [data-slot="composer-root"],[data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
+    'html.dark{' +
+    '--ui-bg-input:#2A241F;' +
+    '--ui-bg-elevated:#28221E !important;' +
+    '--dt-card:#28221E !important;' +
+    '--dt-popover:color-mix(in srgb,#28221E 96%,transparent) !important;' +
+    '}' +
+    // Element-scoped composer rules redeclare --composer-fill and beat :root.
+    'html:not(.dark) [data-slot="composer-root"],html:not(.dark) [data-hud-shell] [data-slot="composer-root"],html:not(.dark) [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
     '}' +
-    // Sidebar section labels (PINNED / SESSIONS) default to the raw accent
-    // #B4503A at 10.24px over #EDEAE2 = 4.20:1, under the 4.5:1 AA floor.
-    // The darker accentForeground token reaches 6.28:1.
-    '[data-slot="sidebar-group"] .group\\/section-label{color:#8B3C28 !important;}'
+    'html.dark [data-slot="composer-root"],html.dark [data-hud-shell] [data-slot="composer-root"],html.dark [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
+    '--composer-fill:color-mix(in srgb,#332B24 94%,transparent) !important;' +
+    '}' +
+    // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
+    'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#8B3C28 !important;--theme-primary:#8B3C28;}' +
+    'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D08A6F !important;--theme-primary:#D08A6F;}' +
+    // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
+    'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EDE6DC 72%,transparent) !important;}' +
+    'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 70%,transparent) !important;}'
 }
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
