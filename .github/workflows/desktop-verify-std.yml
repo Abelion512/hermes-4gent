@@ -38,7 +38,7 @@ jobs:
           git log --oneline -3
           git diff --stat origin/${{ github.base_ref }}...HEAD || true
       - name: Install desktop workspace (no lifecycle scripts)
-        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared"
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
       - name: ESLint
         working-directory: apps/desktop
         run: pnpm run lint
@@ -55,25 +55,29 @@ jobs:
     name: Build and Playwright E2E (Electron under xvfb)
     needs: static
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Electron system libraries
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libatk-bridge2.0-0 libgbm1 libasound2t64
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
       - uses: ./.github/actions/setup-pm
         with:
-          toolchain: node
+          toolchain: all
+          extras: '["all"]'
+          test-environment: 'true'
           save-tools-cache: 'false'
           save-node-cache: 'false'
           save-python-cache: 'false'
-      - name: Install workspace and Electron runtime
-        run: |
-          pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared"
-          node scripts/build/electron-runtime.mjs --source .
+      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
+        run: pnpm install --frozen-lockfile
+      - name: Prepare locked Electron runtime
+        run: node scripts/build/electron-runtime.mjs --source .
       - name: Build, then Playwright E2E
         working-directory: apps/desktop
         env:
