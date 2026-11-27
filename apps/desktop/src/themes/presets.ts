@@ -477,10 +477,55 @@ export const paperTheme: DesktopTheme = {
     userBubble: '#F8EBE5', // derived: reference has no chat UI
     userBubbleBorder: '#E7D3C8'
   },
+  // A light-only skin is painted through synthLightColors() (context.tsx
+  // paletteFor), which re-derives a near-white palette from the accent and
+  // discards the authored colors. Declaring darkColors marks this a
+  // both-modes skin so light paints `colors` exactly as authored.
+  // darkColors is the warm "paper at night" counterpart, derived from the
+  // same palette (no reference source): every text pair is WCAG AA+.
+  darkColors: {
+    background: '#201D19',
+    foreground: '#EDE9E0',
+    card: '#2A2620',
+    cardForeground: '#EDE9E0',
+    muted: '#332E26',
+    mutedForeground: '#A79F92',
+    popover: '#2A2620',
+    popoverForeground: '#EDE9E0',
+    primary: '#D0785F',
+    primaryForeground: '#241612',
+    secondary: '#3A2E26',
+    secondaryForeground: '#E8D5C9',
+    accent: '#3A2E26',
+    accentForeground: '#EFC9B8',
+    border: '#453E34',
+    input: '#453E34',
+    ring: '#D0785F',
+    midground: '#D0785F',
+    midgroundForeground: '#241612',
+    destructive: '#D47B6C',
+    destructiveForeground: '#2A1210',
+    sidebarBackground: '#252119',
+    sidebarBorder: '#453E34',
+    userBubble: '#40332A',
+    userBubbleBorder: '#57453A'
+  },
   typography: {
     fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
     fontMono: SYSTEM_MONO
-  }
+  },
+  // The light-mode design defaults paint chat bubbles and text inputs
+  // near-white (mix-bubble 0% -> neutral-card #fcfcfc, --ui-bg-input literal)
+  // regardless of the skin's seeds. Paper's palette has warm tokens for both
+  // (userBubble #F8EBE5, a warm input tint derived from the paper tone), so
+  // claim the surfaces here. Scoped to this skin: customCSS is injected only
+  // while paper is active, other themes keep the defaults.
+  customCSS:
+    ':root{' +
+    '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
+    '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
+    '--ui-bg-input:#FAF8F3;' +
+    '}'
 }
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
