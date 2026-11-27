@@ -21,7 +21,7 @@
 import { THEME_PRESET_PALETTES } from '@hermes/shared'
 
 import { skinToDesktopTheme } from './skin'
-import type { DesktopTheme, DesktopThemeTypography } from './types'
+import type { DesktopTheme, DesktopThemeColors, DesktopThemeTypography } from './types'
 
 // Color-emoji fonts to append to every stack as a last resort. None of the UI
 // text/mono fonts carry emoji glyphs, so without this emoji render as tofu
@@ -447,11 +447,7 @@ export const slateTheme: DesktopTheme = {
  * paper tone so long sessions stay low-glare; every text pair is WCAG AA+.
  * Tokens without a reference source are marked derived.
  */
-export const paperTheme: DesktopTheme = {
-  name: 'paper',
-  label: 'Paper',
-  description: 'Warm paper and terracotta, low-glare for long sessions',
-  colors: {
+const PAPER_LIGHT_COLORS: DesktopThemeColors = {
     background: '#F4F2ED',
     foreground: '#191816',
     card: '#FFFFFF',
@@ -476,40 +472,24 @@ export const paperTheme: DesktopTheme = {
     sidebarBorder: '#E1DDD4',
     userBubble: '#F8EBE5', // derived: reference has no chat UI
     userBubbleBorder: '#E7D3C8'
-  },
+  }
+
+export const paperTheme: DesktopTheme = {
+  name: 'paper',
+  label: 'Paper',
+  description: 'Warm paper and terracotta, low-glare for long sessions',
+  colors: PAPER_LIGHT_COLORS,
   // A light-only skin is painted through synthLightColors() (context.tsx
   // paletteFor), which re-derives a near-white palette from the accent and
   // discards the authored colors. Declaring darkColors marks this a
   // both-modes skin so light paints `colors` exactly as authored.
-  // darkColors is the warm "paper at night" counterpart, derived from the
-  // same palette (no reference source): every text pair is WCAG AA+.
-  darkColors: {
-    background: '#201D19',
-    foreground: '#EDE9E0',
-    card: '#2A2620',
-    cardForeground: '#EDE9E0',
-    muted: '#332E26',
-    mutedForeground: '#A79F92',
-    popover: '#2A2620',
-    popoverForeground: '#EDE9E0',
-    primary: '#D0785F',
-    primaryForeground: '#241612',
-    secondary: '#3A2E26',
-    secondaryForeground: '#E8D5C9',
-    accent: '#3A2E26',
-    accentForeground: '#EFC9B8',
-    border: '#453E34',
-    input: '#453E34',
-    ring: '#D0785F',
-    midground: '#D0785F',
-    midgroundForeground: '#241612',
-    destructive: '#D47B6C',
-    destructiveForeground: '#2A1210',
-    sidebarBackground: '#252119',
-    sidebarBorder: '#453E34',
-    userBubble: '#40332A',
-    userBubbleBorder: '#57453A'
-  },
+  // Declaring darkColors marks this a both-modes skin so paletteFor never
+  // routes paper through synthLightColors(). It is the SAME authored warm
+  // palette, not a dark variant: paper paints the approved low-glare warm
+  // look identically in light and dark mode, so an OS dark-mode flip never
+  // changes what the user sees. (Hermes review F1 prescribed exactly this:
+  // darkColors: paperTheme.colors.)
+  darkColors: PAPER_LIGHT_COLORS,
   typography: {
     fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
     fontMono: SYSTEM_MONO
@@ -540,7 +520,11 @@ export const paperTheme: DesktopTheme = {
     // directly; !important wins over the app's normal rules at any order.
     '[data-slot="composer-root"],[data-hud-shell] [data-slot="composer-root"],[data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
-    '}'
+    '}' +
+    // Sidebar section labels (PINNED / SESSIONS) default to the raw accent
+    // #B4503A at 10.24px over #EDEAE2 = 4.20:1, under the 4.5:1 AA floor.
+    // The darker accentForeground token reaches 6.28:1.
+    '[data-slot="sidebar-group"] .group\\/section-label{color:#8B3C28 !important;}'
 }
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
