@@ -63,7 +63,9 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: (element: 
   const { t } = useI18n()
   const [broken, setBroken] = useState<string[]>([])
   const [viewAt, setViewAt] = useState<number | null>(null)
+  const [picked, setPicked] = useState(0)
   const live = listing.images.filter(src => !broken.includes(src))
+  const main = Math.min(picked, Math.max(live.length - 1, 0))
   const spec = productSpec(listing)
 
   return (
@@ -109,7 +111,9 @@ function ProductDetail({
   const { t } = useI18n()
   const [broken, setBroken] = useState<string[]>([])
   const [viewAt, setViewAt] = useState<number | null>(null)
+  const [picked, setPicked] = useState(0)
   const live = listing.images.filter(src => !broken.includes(src))
+  const main = Math.min(picked, Math.max(live.length - 1, 0))
   const spec = productSpec(listing)
 
   return (
@@ -124,17 +128,17 @@ function ProductDetail({
     >
       {live.length > 0 && (
         <button
-          aria-label={`${t.desktop.openImage} 1/${live.length}`}
+          aria-label={`${t.desktop.openImage} ${main + 1}/${live.length}`}
           className="block aspect-square w-full cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55"
-          onClick={() => setViewAt(0)}
+          onClick={() => setViewAt(main)}
           type="button"
         >
           <img
             alt=""
-            className="size-full object-cover"
-            onError={() => setBroken(prev => (prev.includes(live[0]) ? prev : [...prev, live[0]]))}
+            className="size-full object-contain"
+            onError={() => setBroken(prev => (prev.includes(live[main]) ? prev : [...prev, live[main]]))}
             referrerPolicy="no-referrer"
-            src={live[0]}
+            src={live[main]}
           />
         </button>
       )}
@@ -142,12 +146,16 @@ function ProductDetail({
       <span className="flex min-w-0 flex-col gap-3">
         {live.length > 1 && (
           <span className="flex flex-wrap gap-1.5">
-            {live.slice(1).map((src, i) => (
+            {live.map((src, i) => (
               <button
-                aria-label={`${t.desktop.openImage} ${i + 2}/${live.length}`}
-                className="block size-16 cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55"
+                aria-label={`${i + 1}/${live.length}`}
+                aria-pressed={i === main}
+                className={cn(
+                  'block size-16 cursor-pointer overflow-hidden rounded-2xl bg-muted/55',
+                  i !== main && 'opacity-60 hover:opacity-100'
+                )}
                 key={src}
-                onClick={() => setViewAt(i + 1)}
+                onClick={() => setPicked(i)}
                 type="button"
               >
                 <img

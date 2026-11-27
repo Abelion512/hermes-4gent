@@ -95,7 +95,7 @@ describe('ProductRow', () => {
     fireEvent.click(screen.getByText('Laptop A'))
 
     expect(screen.getByRole('button', { name: 'Open image 1/2' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Open image 2/2' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '2/2' })).toBeTruthy()
   })
 
   it('drops a broken photo and falls through to the next one', () => {
