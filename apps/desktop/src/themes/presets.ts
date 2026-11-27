@@ -474,32 +474,32 @@ const PAPER_LIGHT_COLORS: DesktopThemeColors = {
   userBubbleBorder: '#DCC6B8'
 }
 
-/** Dark counterpart: same warm terracotta family on a dim brown-black canvas. */
+/** Dark counterpart: same warm terracotta family on a dim rose-black canvas. */
 const PAPER_DARK_COLORS: DesktopThemeColors = {
-  background: '#1E1A17',
-  foreground: '#EDE6DC',
-  card: '#28221E',
-  cardForeground: '#EDE6DC',
-  muted: '#241F1B',
-  mutedForeground: '#A79D91',
-  popover: '#28221E',
-  popoverForeground: '#EDE6DC',
-  primary: '#D08A6F',
+  background: '#1E1819',
+  foreground: '#EFE4E3',
+  card: '#272021',
+  cardForeground: '#EFE4E3',
+  muted: '#221C1D',
+  mutedForeground: '#AD9FA0',
+  popover: '#272021',
+  popoverForeground: '#EFE4E3',
+  primary: '#D9887A',
   primaryForeground: '#241611',
-  secondary: '#3A2E27',
-  secondaryForeground: '#D8CFC2',
-  accent: '#3A2E27',
-  accentForeground: '#E0A487',
-  border: '#3D352E',
-  input: '#3D352E',
-  ring: '#D08A6F',
-  midground: '#D08A6F',
-  destructive: '#C56B52',
+  secondary: '#3A2A2B',
+  secondaryForeground: '#E3D6D5',
+  accent: '#3A2A2B',
+  accentForeground: '#EBA39A',
+  border: '#3D3031',
+  input: '#3D3031',
+  ring: '#D9887A',
+  midground: '#D9887A',
+  destructive: '#D0705F',
   destructiveForeground: '#241611',
-  sidebarBackground: '#241F1B',
-  sidebarBorder: '#3D352E',
-  userBubble: '#3A2E27',
-  userBubbleBorder: '#4A3B31'
+  sidebarBackground: '#221C1D',
+  sidebarBorder: '#3D3031',
+  userBubble: '#3A2A2B',
+  userBubbleBorder: '#4D3A3B'
 }
 
 export const paperTheme: DesktopTheme = {
@@ -531,24 +531,25 @@ export const paperTheme: DesktopTheme = {
     '--dt-popover:color-mix(in srgb,#FAF8F3 96%,transparent) !important;' +
     '}' +
     'html.dark{' +
-    '--ui-bg-input:#2A241F;' +
-    '--ui-bg-elevated:#28221E !important;' +
-    '--dt-card:#28221E !important;' +
-    '--dt-popover:color-mix(in srgb,#28221E 96%,transparent) !important;' +
+    '--ui-bg-input:#2A2223;' +
+    '--ui-bg-elevated:#272021 !important;' +
+    '--dt-card:#272021 !important;' +
+    '--dt-popover:color-mix(in srgb,#272021 96%,transparent) !important;' +
     '}' +
     // Element-scoped composer rules redeclare --composer-fill and beat :root.
     'html:not(.dark) [data-slot="composer-root"],html:not(.dark) [data-hud-shell] [data-slot="composer-root"],html:not(.dark) [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
     '}' +
     'html.dark [data-slot="composer-root"],html.dark [data-hud-shell] [data-slot="composer-root"],html.dark [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
-    '--composer-fill:color-mix(in srgb,#332B24 94%,transparent) !important;' +
+    '--composer-fill:color-mix(in srgb,#322829 94%,transparent) !important;' +
     '}' +
     // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
     'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#8B3C28 !important;--theme-primary:#8B3C28;}' +
-    'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D08A6F !important;--theme-primary:#D08A6F;}' +
+    'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D9887A !important;--theme-primary:#D9887A;}' +
     // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
-    'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EDE6DC 72%,transparent) !important;}' +
-    'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 70%,transparent) !important;}'
+    'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EFE4E3 72%,transparent) !important;}' +
+    'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 70%,transparent) !important;}' +
+    'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 70%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 70%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 70%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;}'
 }
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
