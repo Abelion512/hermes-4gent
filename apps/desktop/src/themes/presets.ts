@@ -518,13 +518,16 @@ export const paperTheme: DesktopTheme = {
   // near-white (mix-bubble 0% -> neutral-card #fcfcfc, --ui-bg-input literal)
   // regardless of the skin's seeds. Paper's palette has warm tokens for both
   // (userBubble #F8EBE5, a warm input tint derived from the paper tone), so
-  // claim the surfaces here. Scoped to this skin: customCSS is injected only
-  // while paper is active, other themes keep the defaults.
+  // claim the surfaces here. The composer backing layer resolves from
+  // --dt-card (white card seed mixed over #fcfcfc), so give it a warm fill a
+  // step above the paper canvas. Scoped to this skin: customCSS is injected
+  // only while paper is active, other themes keep the defaults.
   customCSS:
     ':root{' +
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '--ui-bg-input:#FAF8F3;' +
+    '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent);' +
     '}'
 }
 
