@@ -441,6 +441,48 @@ export const slateTheme: DesktopTheme = {
   }
 }
 
+/**
+ * Paper - warm off-white paper with a terracotta accent, lifted from the
+ * headphone-showdown reference page the user picked. Broad surfaces sit on the
+ * paper tone so long sessions stay low-glare; every text pair is WCAG AA+.
+ * Tokens without a reference source are marked derived.
+ */
+export const paperTheme: DesktopTheme = {
+  name: 'paper',
+  label: 'Paper',
+  description: 'Warm paper and terracotta, low-glare for long sessions',
+  colors: {
+    background: '#F4F2ED',
+    foreground: '#191816',
+    card: '#FFFFFF',
+    cardForeground: '#191816',
+    muted: '#EDEAE2', // derived: one step darker than the paper tone
+    mutedForeground: '#6C6861',
+    popover: '#FFFFFF',
+    popoverForeground: '#191816',
+    primary: '#B4503A',
+    primaryForeground: '#FFFFFF', // derived: reference has no buttons
+    secondary: '#F8EBE5',
+    secondaryForeground: '#514D46',
+    accent: '#F8EBE5',
+    accentForeground: '#8B3C28',
+    border: '#E1DDD4',
+    input: '#E1DDD4',
+    ring: '#B4503A',
+    midground: '#B4503A',
+    destructive: '#8B3C28', // derived: dark accent doubles as the danger hue
+    destructiveForeground: '#FFFFFF',
+    sidebarBackground: '#EDEAE2', // derived: reference page has no sidebar
+    sidebarBorder: '#E1DDD4',
+    userBubble: '#F8EBE5', // derived: reference has no chat UI
+    userBubbleBorder: '#E7D3C8'
+  },
+  typography: {
+    fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
+    fontMono: SYSTEM_MONO
+  }
+}
+
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
   nous: nousTheme,
   github: githubTheme,
@@ -453,7 +495,8 @@ export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
   ember: emberTheme,
   mono: monoTheme,
   slate: slateTheme,
-  cyberpunk: cyberpunkTheme
+  cyberpunk: cyberpunkTheme,
+  paper: paperTheme
 }
 
 export const BUILTIN_THEME_LIST = Object.values(BUILTIN_THEMES)
