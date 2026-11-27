@@ -38,7 +38,7 @@ jobs:
           git log --oneline -3
           git diff --stat origin/${{ github.base_ref }}...HEAD || true
       - name: Install desktop workspace (no lifecycle scripts)
-        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..."
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared"
       - name: ESLint
         working-directory: apps/desktop
         run: pnpm run lint
@@ -72,7 +72,7 @@ jobs:
           save-python-cache: 'false'
       - name: Install workspace and Electron runtime
         run: |
-          pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..."
+          pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared"
           node scripts/build/electron-runtime.mjs --source .
       - name: Build, then Playwright E2E
         working-directory: apps/desktop
