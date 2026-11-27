@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { type RefObject, useRef, useState } from 'react'
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
 import { type Listing } from '@/lib/listing-embed'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,9 @@ function productSpec(listing: Listing): string {
  */
 export function ProductRow({ listings }: { listings: Listing[] }) {
   const [open, setOpen] = useState<Listing | null>(null)
+  // The dialog has no Trigger, so Radix has nowhere to return focus: hand it the
+  // card body that opened the popup.
+  const opener = useRef<HTMLElement | null>(null)
 
   return (
     <>
@@ -36,18 +40,26 @@ export function ProductRow({ listings }: { listings: Listing[] }) {
         data-slot="aui_product-row"
       >
         {listings.map(listing => (
-          <ProductCard key={listing.id} listing={listing} onOpen={() => setOpen(listing)} />
+          <ProductCard
+            key={listing.id}
+            listing={listing}
+            onOpen={element => {
+              opener.current = element
+              setOpen(listing)
+            }}
+          />
         ))}
       </span>
 
       <Dialog onOpenChange={next => !next && setOpen(null)} open={open !== null}>
-        {open && <ProductDetail listing={open} />}
+        {open && <ProductDetail listing={open} returnFocusTo={opener} />}
       </Dialog>
     </>
   )
 }
 
-function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: () => void }) {
+function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: (element: HTMLElement) => void }) {
+  const { t } = useI18n()
   const [broken, setBroken] = useState<string[]>([])
   const [viewAt, setViewAt] = useState<number | null>(null)
   const live = listing.images.filter(src => !broken.includes(src))
@@ -57,13 +69,13 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: () => void
     <span className="not-prose flex w-44 shrink-0 snap-start flex-col gap-2" data-slot="aui_product-card">
       {live.length > 0 && (
         <button
-          aria-label={listing.address}
+          aria-label={`${t.desktop.openImage}: ${listing.address}`}
           className="block aspect-4/3 w-full cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55"
           onClick={() => setViewAt(0)}
           type="button"
         >
           <img
-            alt={listing.address}
+            alt=""
             className="size-full object-cover"
             loading="lazy"
             onError={() => setBroken(prev => (prev.includes(live[0]) ? prev : [...prev, live[0]]))}
@@ -73,7 +85,7 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: () => void
         </button>
       )}
 
-      <button className="block min-w-0 cursor-pointer text-left" onClick={onOpen} type="button">
+      <button className="block min-w-0 cursor-pointer text-left" onClick={event => onOpen(event.currentTarget)} type="button">
         <span className={cn(TEXT_CLASS, 'block truncate font-medium text-foreground')}>{listing.address}</span>
         {listing.price && (
           <span className={cn(TEXT_CLASS, 'block tabular-nums text-foreground')}>{listing.price}</span>
@@ -86,35 +98,54 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: () => void
   )
 }
 
-function ProductDetail({ listing }: { listing: Listing }) {
+function ProductDetail({
+  listing,
+  returnFocusTo
+}: {
+  listing: Listing
+  returnFocusTo: RefObject<HTMLElement | null>
+}) {
+  const { t } = useI18n()
   const [broken, setBroken] = useState<string[]>([])
   const [viewAt, setViewAt] = useState<number | null>(null)
   const live = listing.images.filter(src => !broken.includes(src))
   const spec = productSpec(listing)
 
   return (
-    <DialogContent bodyClassName="gap-3 overflow-y-auto" className="max-h-[85vh]">
+    <DialogContent
+      bodyClassName="gap-3 overflow-y-auto"
+      className="max-h-[85vh]"
+      onCloseAutoFocus={event => {
+        event.preventDefault()
+        returnFocusTo.current?.focus()
+      }}
+    >
       {live.length > 0 && (
-        <span className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {live.map((src, index) => (
-            <button
-              className={cn(
-                'block shrink-0 cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55',
-                index === 0 ? 'aspect-4/3 w-full' : 'aspect-4/3 w-24'
-              )}
-              key={src}
-              onClick={() => setViewAt(index)}
-              type="button"
-            >
-              <img
-                alt={listing.address}
-                className="size-full object-cover"
-                onError={() => setBroken(prev => (prev.includes(src) ? prev : [...prev, src]))}
-                referrerPolicy="no-referrer"
-                src={src}
-              />
-            </button>
-          ))}
+        <span className="flex flex-col gap-1.5">
+          {/* The hero fills the width; the rest wrap as small tiles under it, so
+              every photo is visible without a hidden horizontal scroll. */}
+          <span className="flex flex-wrap gap-1.5">
+            {live.map((src, index) => (
+              <button
+                aria-label={`${t.desktop.openImage} ${index + 1}/${live.length}`}
+                className={cn(
+                  'block cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55',
+                  index === 0 ? 'aspect-4/3 w-full' : 'size-16'
+                )}
+                key={src}
+                onClick={() => setViewAt(index)}
+                type="button"
+              >
+                <img
+                  alt=""
+                  className="size-full object-cover"
+                  onError={() => setBroken(prev => (prev.includes(src) ? prev : [...prev, src]))}
+                  referrerPolicy="no-referrer"
+                  src={src}
+                />
+              </button>
+            ))}
+          </span>
         </span>
       )}
 
