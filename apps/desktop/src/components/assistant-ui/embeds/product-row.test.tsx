@@ -95,7 +95,7 @@ describe('ProductRow', () => {
     fireEvent.click(screen.getByText('Laptop A'))
 
     expect(screen.getByRole('button', { name: 'Open image 1/2' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '2/2' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /2\/2$/ })).toBeTruthy()
   })
 
   it('drops a broken photo and falls through to the next one', () => {
@@ -116,6 +116,10 @@ describe('ProductRow', () => {
 
     expect(cards(container)[1].querySelector('img')).toBeNull()
     expect(within(cards(container)[1]).queryByRole('button', { name: /Open image/ })).toBeNull()
+    fireEvent.click(screen.getByText('Laptop B'))
+    const dg = screen.getByRole('dialog')
+    const hd = within(dg).getAllByText('Laptop B')[0].parentElement?.className
+    expect(hd).toContain('pr-8')
   })
 
   it('renders model text as text, not markup', () => {

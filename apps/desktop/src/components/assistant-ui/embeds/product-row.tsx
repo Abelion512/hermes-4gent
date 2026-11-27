@@ -3,7 +3,7 @@
 import { type RefObject, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle, preventCloseButtonAutoFocus } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
 import { type Listing } from '@/lib/listing-embed'
@@ -63,9 +63,7 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: (element: 
   const { t } = useI18n()
   const [broken, setBroken] = useState<string[]>([])
   const [viewAt, setViewAt] = useState<number | null>(null)
-  const [picked, setPicked] = useState(0)
   const live = listing.images.filter(src => !broken.includes(src))
-  const main = Math.min(picked, Math.max(live.length - 1, 0))
   const spec = productSpec(listing)
 
   return (
@@ -124,6 +122,7 @@ function ProductDetail({
         event.preventDefault()
         returnFocusTo.current?.focus()
       }}
+      onOpenAutoFocus={live.length === 0 ? preventCloseButtonAutoFocus : undefined}
       overlayClassName="backdrop-blur-md"
     >
       {live.length > 0 && (
@@ -148,7 +147,7 @@ function ProductDetail({
           <span className="flex flex-wrap gap-1.5">
             {live.map((src, i) => (
               <button
-                aria-label={`${i + 1}/${live.length}`}
+                aria-label={`${listing.address} ${i + 1}/${live.length}`}
                 aria-pressed={i === main}
                 className={cn(
                   'block size-16 cursor-pointer overflow-hidden rounded-2xl bg-muted/55',
@@ -170,7 +169,7 @@ function ProductDetail({
           </span>
         )}
 
-        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3 pr-8">
           <DialogTitle>{listing.address}</DialogTitle>
           {listing.price && <span className={cn(TEXT_CLASS, 'font-medium tabular-nums')}>{listing.price}</span>}
         </span>
