@@ -2,6 +2,7 @@
 
 import { type RefObject, useRef, useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
@@ -130,7 +131,7 @@ function ProductDetail({
                 aria-label={`${t.desktop.openImage} ${index + 1}/${live.length}`}
                 className={cn(
                   'block cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55',
-                  index === 0 ? 'aspect-4/3 w-full' : 'size-16'
+                  index === 0 ? 'h-56 w-full' : 'size-16'
                 )}
                 key={src}
                 onClick={() => setViewAt(index)}
@@ -177,9 +178,9 @@ function ProductDetail({
       {listing.links.length > 0 && (
         <span className={cn(META_CLASS, 'flex flex-wrap gap-x-3 gap-y-1')}>
           {listing.links.map(link => (
-            <ExternalLink href={link.url} key={link.url}>
-              {link.label}
-            </ExternalLink>
+            <Button asChild key={link.url} size="xs" variant="chip">
+              <ExternalLink href={link.url}>{link.label}</ExternalLink>
+            </Button>
           ))}
         </span>
       )}
