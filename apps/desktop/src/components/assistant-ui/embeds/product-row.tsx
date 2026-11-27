@@ -135,7 +135,7 @@ function ProductDetail({
         >
           <img
             alt=""
-            className="size-full object-contain"
+            className="size-full object-cover"
             onError={() => setBroken(prev => (prev.includes(live[main]) ? prev : [...prev, live[main]]))}
             referrerPolicy="no-referrer"
             src={live[main]}
