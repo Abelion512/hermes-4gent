@@ -1,0 +1,86 @@
+name: Desktop verify (standard runners)
+
+# Draft. No cache saves, no artifacts, no secrets. Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
+# Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-verify-std.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-verify-std-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: Lint, typecheck, unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Record the checked SHA
+        run: |
+          echo "PR head: ${{ github.event.pull_request.head.sha }}"
+          echo "Checked out: $(git rev-parse HEAD)"
+          git log --oneline -3
+          git diff --stat origin/${{ github.base_ref }}...HEAD || true
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..."
+      - name: ESLint
+        working-directory: apps/desktop
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: apps/desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm run typecheck
+      - name: Unit tests (ui project)
+        working-directory: apps/desktop
+        run: pnpm exec vitest run --project ui
+
+  e2e:
+    name: Build and Playwright E2E (Electron under xvfb)
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Electron system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0 libnss3 libatk-bridge2.0-0 libgbm1 libasound2t64
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install workspace and Electron runtime
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..."
+          node scripts/build/electron-runtime.mjs --source .
+      - name: Build, then Playwright E2E
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          pnpm run build
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list
