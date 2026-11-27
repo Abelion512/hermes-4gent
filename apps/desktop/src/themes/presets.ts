@@ -527,6 +527,12 @@ export const paperTheme: DesktopTheme = {
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '--ui-bg-input:#FAF8F3;' +
+    // Elevated surfaces (menus, selects, dialogs, popovers, command
+    // palette, card utilities) all mix the white card seed over #fcfcfc;
+    // give the three derived tokens the same warm tint as the input.
+    '--ui-bg-elevated:#FAF8F3 !important;' +
+    '--dt-card:#FAF8F3 !important;' +
+    '--dt-popover:color-mix(in srgb,#FAF8F3 96%,transparent) !important;' +
     '}' +
     // Element-scoped composer rules ([data-slot=composer-root] and the
     // data-hud-shell / dock hover-focus variants) redeclare --composer-fill
