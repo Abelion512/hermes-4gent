@@ -114,27 +114,40 @@ function ProductDetail({
 
   return (
     <DialogContent
-      bodyClassName="gap-3 overflow-y-auto"
-      className="max-h-[85vh]"
+      bodyClassName="grid auto-rows-max grid-cols-1 content-start gap-4 overflow-y-auto sm:grid-cols-2"
+      className="max-h-[85vh] sm:max-w-3xl"
       onCloseAutoFocus={event => {
         event.preventDefault()
         returnFocusTo.current?.focus()
       }}
+      overlayClassName="backdrop-blur-md"
     >
       {live.length > 0 && (
-        <span className="flex flex-col gap-1.5">
-          {/* The hero fills the width; the rest wrap as small tiles under it, so
-              every photo is visible without a hidden horizontal scroll. */}
+        <button
+          aria-label={`${t.desktop.openImage} 1/${live.length}`}
+          className="block aspect-square w-full cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55"
+          onClick={() => setViewAt(0)}
+          type="button"
+        >
+          <img
+            alt=""
+            className="size-full object-cover"
+            onError={() => setBroken(prev => (prev.includes(live[0]) ? prev : [...prev, live[0]]))}
+            referrerPolicy="no-referrer"
+            src={live[0]}
+          />
+        </button>
+      )}
+
+      <span className="flex min-w-0 flex-col gap-3">
+        {live.length > 1 && (
           <span className="flex flex-wrap gap-1.5">
-            {live.map((src, index) => (
+            {live.slice(1).map((src, i) => (
               <button
-                aria-label={`${t.desktop.openImage} ${index + 1}/${live.length}`}
-                className={cn(
-                  'block cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55',
-                  index === 0 ? 'h-56 w-full' : 'size-16'
-                )}
+                aria-label={`${t.desktop.openImage} ${i + 2}/${live.length}`}
+                className="block size-16 cursor-zoom-in overflow-hidden rounded-2xl bg-muted/55"
                 key={src}
-                onClick={() => setViewAt(index)}
+                onClick={() => setViewAt(i + 1)}
                 type="button"
               >
                 <img
@@ -147,43 +160,43 @@ function ProductDetail({
               </button>
             ))}
           </span>
-        </span>
-      )}
+        )}
 
-      <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <DialogTitle>{listing.address}</DialogTitle>
-        {listing.price && <span className={cn(TEXT_CLASS, 'font-medium tabular-nums')}>{listing.price}</span>}
+        <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <DialogTitle>{listing.address}</DialogTitle>
+          {listing.price && <span className={cn(TEXT_CLASS, 'font-medium tabular-nums')}>{listing.price}</span>}
+        </span>
+  
+        {spec ? (
+          <DialogDescription className={cn(META_CLASS, 'tabular-nums')}>{spec}</DialogDescription>
+        ) : (
+          <DialogDescription className="sr-only">{listing.address}</DialogDescription>
+        )}
+  
+        {listing.note && <span className={cn(TEXT_CLASS, 'leading-relaxed text-foreground/80')}>{listing.note}</span>}
+  
+        {listing.pros.length > 0 && (
+          <ul className={cn(TEXT_CLASS, 'list-disc space-y-0.5 pl-5 text-foreground/80')}>
+            {listing.pros.map(pro => (
+              <li key={pro}>{pro}</li>
+            ))}
+          </ul>
+        )}
+  
+        {listing.catches.length > 0 && (
+          <span className={cn(META_CLASS, 'text-muted-foreground')}>{listing.catches.join(' · ')}</span>
+        )}
+  
+        {listing.links.length > 0 && (
+          <span className={cn(META_CLASS, 'flex flex-wrap gap-x-3 gap-y-1')}>
+            {listing.links.map(link => (
+              <Button asChild key={link.url} size="xs" variant="chip">
+                <ExternalLink href={link.url}>{link.label}</ExternalLink>
+              </Button>
+            ))}
+          </span>
+        )}
       </span>
-
-      {spec ? (
-        <DialogDescription className={cn(META_CLASS, 'tabular-nums')}>{spec}</DialogDescription>
-      ) : (
-        <DialogDescription className="sr-only">{listing.address}</DialogDescription>
-      )}
-
-      {listing.note && <span className={cn(TEXT_CLASS, 'leading-relaxed text-foreground/80')}>{listing.note}</span>}
-
-      {listing.pros.length > 0 && (
-        <ul className={cn(TEXT_CLASS, 'list-disc space-y-0.5 pl-5 text-foreground/80')}>
-          {listing.pros.map(pro => (
-            <li key={pro}>{pro}</li>
-          ))}
-        </ul>
-      )}
-
-      {listing.catches.length > 0 && (
-        <span className={cn(META_CLASS, 'text-muted-foreground')}>{listing.catches.join(' · ')}</span>
-      )}
-
-      {listing.links.length > 0 && (
-        <span className={cn(META_CLASS, 'flex flex-wrap gap-x-3 gap-y-1')}>
-          {listing.links.map(link => (
-            <Button asChild key={link.url} size="xs" variant="chip">
-              <ExternalLink href={link.url}>{link.label}</ExternalLink>
-            </Button>
-          ))}
-        </span>
-      )}
 
       <ListingLightbox alt={listing.address} images={live} onOpenAt={setViewAt} openAt={viewAt} />
     </DialogContent>
