@@ -1,19 +1,6 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { type NoProviderFixture, setupNoProvider } from './fixtures'
+import { rendererCss } from './renderer-css'
 import { expect, test } from './test'
-
-function rendererCss(): string {
-  const assetsDir = path.resolve(import.meta.dirname, '..', 'dist', 'assets')
-  const stylesheet = fs.readdirSync(assetsDir).find(file => /^index-.*\.css$/.test(file))
-
-  if (!stylesheet) {
-    throw new Error(`Desktop renderer stylesheet not found in ${assetsDir}`)
-  }
-
-  return fs.readFileSync(path.join(assetsDir, stylesheet), 'utf8')
-}
 
 let fixture: NoProviderFixture | null = null
 

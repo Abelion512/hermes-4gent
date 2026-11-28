@@ -1,0 +1,674 @@
+name: Desktop verify (standard runners)
+
+# Draft. No cache saves, no secrets; the only artifact is the Paper screenshot PNGs (synthetic mock UI). Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
+# Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
+on:
+  pull_request:
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-verify-std.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-verify-std-v6-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scope:
+    name: Classify change scope (full unless proven palette-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      scope: ${{ steps.classify.outputs.scope }}
+      files: ${{ steps.classify.outputs.files }}
+      reason: ${{ steps.classify.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Compare this tree with the previous PR head
+        id: classify
+        env:
+          EVENT: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -u
+          scope=full
+          reason=""
+          files=""
+          finish() {
+            echo "scope=$scope" >> "$GITHUB_OUTPUT"
+            echo "files=$files" >> "$GITHUB_OUTPUT"
+            echo "reason=$reason" >> "$GITHUB_OUTPUT"
+            echo "SCOPE=$scope"
+            echo "REASON=$reason"
+            echo "FILES=$files"
+            exit 0
+          }
+          if [ "$EVENT" != "synchronize" ]; then
+            reason="event is not a push to an open PR, so there is no previous head to compare against"; finish
+          fi
+          if [ -z "$BEFORE" ] || printf '%s' "$BEFORE" | grep -Eq '^0+$'; then
+            reason="previous head sha is missing"; finish
+          fi
+          if ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            reason="previous head is not in the fetched history (force-push or missing base)"; finish
+          fi
+          if ! changed=$(git diff --name-only "$BEFORE" HEAD); then
+            reason="could not diff previous head against the tested tree"; finish
+          fi
+          if [ -z "$changed" ]; then
+            reason="empty diff since the previous head, cannot tell why this run started"; finish
+          fi
+          while IFS= read -r f; do
+            case "$f" in
+              apps/desktop/src/themes/presets.ts|apps/desktop/src/themes/presets.test.ts)
+                files="${files:+$files }$f" ;;
+              *)
+                files=""; reason="changed outside the theme palette files: $f"; finish ;;
+            esac
+          done <<EOF2
+          $changed
+          EOF2
+          if printf '%s\n' "$changed" | grep -qx 'apps/desktop/src/themes/presets.ts'; then
+            if ! pd=$(git diff -U0 "$BEFORE" HEAD -- apps/desktop/src/themes/presets.ts); then
+              reason="could not read the presets.ts diff"; finish
+            fi
+            if printf '%s\n' "$pd" | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)' | grep -Eq 'BUILTIN_THEME|RETIRED_SKINS|DEFAULT_SKIN_NAME|^[+-][[:space:]]*(export|import)[[:space:]]|^[+-][[:space:]]*(name|label|description|typography|fontSans|fontMono):|[A-Za-z]+Theme[,:]|darkColors'; then
+              files=""; reason="presets.ts change touches the theme registry, names or structure, not only palette values"; finish
+            fi
+          fi
+          scope=theme
+          reason="every changed path since the previous head is a Paper palette file and presets.ts changed palette values only"
+          finish
+
+  static:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Record the checked SHA
+        run: |
+          echo "PR head: ${{ github.event.pull_request.head.sha }}"
+          echo "Checked out: $(git rev-parse HEAD)"
+          git log --oneline -3
+          git diff --stat origin/${{ github.base_ref }}...HEAD || true
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: ESLint
+        working-directory: apps/desktop
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: apps/desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm run typecheck
+
+  unit:
+    name: Unit tests (ui project, shard ${{ matrix.shard }}/4)
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Unit tests (shard ${{ matrix.shard }}/4 of the ui project)
+        working-directory: apps/desktop
+        run: pnpm exec vitest run --project ui --shard=${{ matrix.shard }}/4
+
+  unit-scoped:
+    name: Unit tests related to the changed palette files (scoped, not the full suite)
+    needs: scope
+    if: needs.scope.outputs.scope == 'theme'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Unit tests related to the changed files (vitest related)
+        working-directory: apps/desktop
+        env:
+          CHANGED_FILES: ${{ needs.scope.outputs.files }}
+        run: |
+          echo "SCOPED unit run for: $CHANGED_FILES"
+          files=""
+          for f in $CHANGED_FILES; do files="$files ${f#apps/desktop/}"; done
+          pnpm exec vitest related --run --project ui $files
+
+  e2e:
+    name: Build and Playwright E2E (Electron under xvfb)
+    needs: [scope, static]
+    if: needs.scope.outputs.scope == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Electron system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: all
+          extras: '["all"]'
+          test-environment: 'true'
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
+        run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Prepare locked Electron runtime
+        run: node scripts/build/electron-runtime.mjs --source .
+      - name: Link the PM environment at the repo path the specs hardcode (CI checkout only)
+        run: |
+          if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
+          test -x .venv/bin/python
+      - name: Record the exact source tested
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
+      - name: Build, then Playwright E2E
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/pw-results.json
+          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
+          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
+          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
+            echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
+          fi
+          export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
+          pnpm run build
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list,json
+      - name: Per-test result list (log and job summary only, no artifact)
+        if: always()
+        run: |
+          cat > /tmp/summ.cjs <<'JS'
+          const fs = require('fs')
+          let r
+          try { r = JSON.parse(fs.readFileSync('/tmp/pw-results.json', 'utf8')) } catch (e) { console.log('RESULT-LIST no json: ' + e.message); process.exit(0) }
+          const rows = []
+          const walk = (suite, file) => {
+            for (const sp of suite.specs || []) for (const t of sp.tests || []) {
+              const last = (t.results || []).slice(-1)[0] || {}
+              rows.push((t.status || last.status || '?') + ' | ' + (sp.file || file) + ':' + sp.line + ' | ' + (sp.title || '').slice(0, 110))
+            }
+            for (const c of suite.suites || []) walk(c, suite.file || file)
+          }
+          for (const s of r.suites || []) walk(s, s.file)
+          rows.sort()
+          const out = rows.map((x) => 'RESULT-LIST ' + x).join('\n')
+          console.log(out)
+          console.log('RESULT-COUNTS ' + JSON.stringify(r.stats || {}))
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Per-test E2E results\n```\n' + rows.join('\n') + '\n```\n' + JSON.stringify(r.stats || {}) + '\n')
+          JS
+          node /tmp/summ.cjs
+
+  e2e-scoped:
+    name: Build and scoped Playwright E2E (smoke and style-sensitive specs, not the full suite)
+    needs: [scope, static]
+    if: needs.scope.outputs.scope == 'theme'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Electron system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: all
+          extras: '["all"]'
+          test-environment: 'true'
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
+        run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Prepare locked Electron runtime
+        run: node scripts/build/electron-runtime.mjs --source .
+      - name: Link the PM environment at the repo path the specs hardcode (CI checkout only)
+        run: |
+          if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
+          test -x .venv/bin/python
+      - name: Record the exact source tested
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
+      - name: Build, then Playwright E2E
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/pw-results.json
+          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
+          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
+          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
+            echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
+          fi
+          export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
+          pnpm run build
+          echo "SCOPED E2E: boot, sidebar-states (smoke) and markdown-overflow, sticky-prompt-clip, group-room-native (style/layout sensitive). Known failures in these specs are NOT excluded and fail this job. Skipped: all other specs."
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/boot.spec.ts e2e/sidebar-states.spec.ts e2e/markdown-overflow.spec.ts e2e/sticky-prompt-clip.spec.ts e2e/group-room-native.spec.ts --reporter=list,json
+      - name: Per-test result list (log and job summary only, no artifact)
+        if: always()
+        run: |
+          cat > /tmp/summ.cjs <<'JS'
+          const fs = require('fs')
+          let r
+          try { r = JSON.parse(fs.readFileSync('/tmp/pw-results.json', 'utf8')) } catch (e) { console.log('RESULT-LIST no json: ' + e.message); process.exit(0) }
+          const rows = []
+          const walk = (suite, file) => {
+            for (const sp of suite.specs || []) for (const t of sp.tests || []) {
+              const last = (t.results || []).slice(-1)[0] || {}
+              rows.push((t.status || last.status || '?') + ' | ' + (sp.file || file) + ':' + sp.line + ' | ' + (sp.title || '').slice(0, 110))
+            }
+            for (const c of suite.suites || []) walk(c, suite.file || file)
+          }
+          for (const s of r.suites || []) walk(s, s.file)
+          rows.sort()
+          const out = rows.map((x) => 'RESULT-LIST ' + x).join('\n')
+          console.log(out)
+          console.log('RESULT-COUNTS ' + JSON.stringify(r.stats || {}))
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Per-test E2E results\n```\n' + rows.join('\n') + '\n```\n' + JSON.stringify(r.stats || {}) + '\n')
+          JS
+          node /tmp/summ.cjs
+
+  paper-visual:
+    name: Paper theme screenshots (synthetic fixture only, not a verdict input)
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Electron system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: all
+          extras: '["all"]'
+          test-environment: 'true'
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
+        run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Prepare locked Electron runtime
+        run: node scripts/build/electron-runtime.mjs --source .
+      - name: Link the PM environment at the repo path the specs hardcode (CI checkout only)
+        run: |
+          if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
+          test -x .venv/bin/python
+      - name: Record the exact source tested
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
+      - name: Write the screenshot spec (generated at run time, not committed)
+        working-directory: apps/desktop
+        run: |
+          cat > e2e/zz-paper-visual.spec.ts <<'TS'
+          import fs from 'node:fs'
+
+          import { runDesktopChatSmoke } from '../../../tests-js/scripts/desktop-chat-smoke'
+
+          import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+          import { expect, test } from './test'
+
+          const OUT = process.env.PAPER_SHOTS_DIR || '/tmp/paper-shots'
+          const FENCE = String.fromCharCode(96).repeat(3)
+          const SIZES = [
+            { label: 'desktop-1220x800', width: 1220, height: 800 },
+            { label: 'narrow-480x800', width: 480, height: 800 }
+          ]
+
+          // Synthetic fixture text only. No private or user content.
+          const MD_REPLY = [
+            '## Paper markdown fixture',
+            '',
+            'A paragraph with **bold**, *italic*, `inline code` and a [link](https://example.com).',
+            '',
+            '- first bullet',
+            '- second bullet with more words to wrap across the line when the window is narrow',
+            '',
+            '> A blockquote line used to check the quote styling.',
+            '',
+            '| Name | Value | Note |',
+            '| --- | --- | --- |',
+            '| alpha | 1 | first row |',
+            '| beta | 22 | second row |',
+            '',
+            FENCE + 'ts',
+            'export function add(a: number, b: number): number {',
+            '  return a + b // a code block to check mono font and surface',
+            '}',
+            FENCE,
+            '',
+            'END-OF-MD-FIXTURE'
+          ].join('\n')
+
+          const longReply = (n: number): string =>
+            Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of long reply ${n}: synthetic text to fill the transcript and exercise scrolling.`).join('\n\n') +
+            `\n\nEND-OF-LONG-${n}`
+
+          const replyForPrompt = (prompt: string): string => {
+            if (prompt.includes('PAPER_MD')) return MD_REPLY
+            const m = /PAPER_LONG_(\d)/.exec(prompt)
+            return m ? longReply(Number(m[1])) : 'Hello from the mock inference server! The full boot chain is working.'
+          }
+
+          for (const theme of ['paper', 'paper-warm'] as const) for (const mode of ['light', 'dark'] as const) {
+            test.describe(`${theme} ${mode}`, () => {
+              let fx: MockBackendFixture | null = null
+
+              test.beforeAll(async () => {
+                fs.mkdirSync(OUT, { recursive: true })
+                fx = await setupMockBackend({ mockServer: { replyForPrompt } })
+                await waitForAppReady(fx!, 120_000)
+                // Seed Paper before the app code of the next load runs, then reload so boot reads it.
+                await fx!.page.context().addInitScript(([t, m]) => {
+                  // Seed once per page session only, so a later in-test reload reads the persisted pick, not the seed.
+                  if (sessionStorage.getItem('paper-visual-seeded') === '1') return
+                  sessionStorage.setItem('paper-visual-seeded', '1')
+                  localStorage.setItem('hermes-desktop-theme-v2', t)
+                  localStorage.setItem('hermes-desktop-mode-v1', m)
+                }, [theme, mode])
+                await fx!.page.evaluate(([t, m]) => {
+                  localStorage.setItem('hermes-desktop-theme-v2', t)
+                  localStorage.setItem('hermes-desktop-mode-v1', m)
+                }, [theme, mode])
+                await fx!.page.reload()
+                await waitForAppReady(fx!, 120_000)
+              })
+
+              test.afterAll(async () => {
+                await fx?.cleanup()
+                fx = null
+              })
+
+              test(`${theme} ${mode} is active and screenshots`, async () => {
+                test.setTimeout(240_000)
+                const page = fx!.page
+
+                const shotBoth = async (scene: string): Promise<void> => {
+                  for (const size of SIZES) {
+                    await fx!.app.evaluate(({ BrowserWindow }, { width, height }) => {
+                      const win = BrowserWindow.getAllWindows()[0]
+                      win.unmaximize()
+                      win.setMinimumSize(300, 300)
+                      win.setBounds({ x: 0, y: 0, width, height })
+                    }, size)
+                    await page.waitForTimeout(800)
+                    const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
+                    console.log('PAPER-VIEWPORT ' + mode + ' ' + scene + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
+                    await page.screenshot({ path: `${OUT}/${theme}-${mode}-${scene}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                  }
+                }
+
+                const send = async (text: string, done: string): Promise<void> => {
+                  await fx!.app.evaluate(({ BrowserWindow }) => {
+                    BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                  })
+                  await page.waitForTimeout(500)
+                  const composer = page.locator('[contenteditable="true"]').first()
+                  await composer.click()
+                  await composer.type(text)
+                  await page.keyboard.press('Enter')
+                  await page.getByText(done).first().waitFor({ state: 'visible', timeout: 60_000 })
+                  await page.waitForTimeout(800)
+                }
+
+                const state = await page.evaluate(() => ({
+                  theme: document.documentElement.dataset.hermesTheme,
+                  mode: document.documentElement.dataset.hermesMode,
+                  bodyBg: getComputedStyle(document.body).backgroundColor
+                }))
+                console.log('PAPER-STATE ' + theme + ' ' + mode + ' ' + JSON.stringify(state))
+                expect(state.theme).toBe(theme)
+                expect(state.mode).toBe(mode)
+
+                await runDesktopChatSmoke(page, {
+                  mockUrl: fx!.mockUrl,
+                  phase: 'installed',
+                  outDir: test.info().outputPath('paper-chat')
+                })
+                await shotBoth('chat')
+
+                await send('PAPER_MD please show the markdown fixture', 'END-OF-MD-FIXTURE')
+                await shotBoth('markdown')
+
+                for (const n of [1, 2, 3]) {
+                  await send(`PAPER_LONG_${n} next long reply`, `END-OF-LONG-${n}`)
+                }
+                await shotBoth('long-chat')
+
+                // Diagnostic: where the composer fill really comes from (computed values only).
+                console.log('PAPER-COMPOSER ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
+                  const root = document.querySelector('[data-slot="composer-root"]')
+                  const surf = document.querySelector('[data-slot="composer-surface"]')
+                  const nodes = surf ? [surf, ...Array.from(surf.querySelectorAll(':scope > *')).slice(0, 4)] : []
+                  return {
+                    fill: root ? getComputedStyle(root).getPropertyValue('--composer-fill') : null,
+                    bgs: nodes.map((n) => getComputedStyle(n).backgroundColor),
+                    border: surf ? getComputedStyle(surf).borderTopColor : null
+                  }
+                })))
+                // Settings: real app UI, opened through its own button.
+                await fx!.app.evaluate(({ BrowserWindow }) => {
+                  BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                })
+                await page.waitForTimeout(500)
+                const gear = page.getByLabel('Open settings').first()
+                if (await gear.count()) {
+                  await gear.click()
+                  await page.waitForTimeout(1500)
+                  console.log('PAPER-SCENE ' + mode + ' settings opened')
+                  await shotBoth('settings')
+                  // Open dropdown menu and keyboard focus (source: ModelSelect uses a Radix select trigger, aria-label Model; model-settings.test.tsx:144 queries combobox 'Model').
+                  const modelBox = page.getByRole('combobox', { name: 'Model', exact: true })
+                  await expect(modelBox).toBeVisible({ timeout: 15000 })
+                  await modelBox.click()
+                  await expect(page.getByRole('listbox')).toBeVisible({ timeout: 15000 })
+                  await page.waitForTimeout(500)
+                  console.log('PAPER-VIEWPORT ' + mode + ' dropdown-open actual ' + JSON.stringify(await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-dropdown-open-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await page.keyboard.press('Escape')
+                  await page.waitForTimeout(400)
+                  await page.keyboard.press('Tab')
+                  await page.waitForTimeout(400)
+                  console.log('PAPER-FOCUS ' + theme + ' ' + mode + ' active=' + (await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + ' ' + (e.getAttribute('aria-label') || e.textContent || '').slice(0, 40) : 'none' })))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-keyboard-focus-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Theme selector: real navigation (nav items are buttons: Settings > Appearance > Theme), real selection, real persistence check. Failures fail this job; nothing is swallowed.
+                  // The model dialog is still open at 480px from the previous shots: close it, restore the desktop window, then open the real Settings page.
+                  await page.keyboard.press('Escape')
+                  await page.waitForTimeout(400)
+                  await page.keyboard.press('Escape')
+                  await fx!.app.evaluate(({ BrowserWindow }) => {
+                    BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                  })
+                  await page.waitForTimeout(800)
+                  await page.getByRole('button', { name: 'Open settings', exact: true }).click({ timeout: 15000 })
+                  await page.waitForTimeout(1200)
+                  await page.getByRole('button', { name: 'Appearance', exact: true }).click({ timeout: 15000 })
+                  await page.getByRole('button', { name: 'Theme', exact: true }).click({ timeout: 15000 })
+                  await page.getByPlaceholder(/Search your themes/).fill('Paper')
+                  const grayCard = page.getByRole('button', { name: /Paper Gray/ })
+                  const warmCard = page.getByRole('button', { name: /Paper Warm/ })
+                  await expect(grayCard).toBeVisible({ timeout: 15000 })
+                  await expect(warmCard).toBeVisible({ timeout: 15000 })
+                  await page.waitForTimeout(800)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-before-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  const other = theme === 'paper' ? 'paper-warm' : 'paper'
+                  await (other === 'paper' ? grayCard : warmCard).click()
+                  await page.waitForTimeout(1200)
+                  const after = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, stored: localStorage.getItem('hermes-desktop-theme-v2'), bodyBg: getComputedStyle(document.body).backgroundColor }))
+                  console.log('PAPER-SELECTOR ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(after))
+                  expect(after.attr).toBe(other)
+                  expect(after.stored).toBe(other)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-after-pick-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Diagnostic: computed border and fill of the Settings controls on this page (values only, not a verdict).
+                  console.log('PAPER-INPUTS ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
+                    const pick = (el: Element) => { const cs = getComputedStyle(el); return { tag: el.tagName, role: el.getAttribute('role'), label: (el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 30), border: cs.borderTopColor, borderW: cs.borderTopWidth, bg: cs.backgroundColor } }
+                    return Array.from(document.querySelectorAll('input, select, [role="combobox"], textarea')).filter((el) => (el as HTMLElement).offsetParent !== null).slice(0, 8).map(pick)
+                  })))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-inputs-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Persistence across a real reload (boot reads the stored pick; the seed no longer overwrites it).
+                  // Settings is an overlay that a reload restores from the hash route, and it covers the composer, so
+                  // waitForAppReady (composer hit-test) cannot pass here. Poll the persisted theme state instead.
+                  // Coverage gap: chat readiness after this reload is not asserted.
+                  await page.reload()
+                  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.hermesTheme), { timeout: 90_000 }).toBe(other)
+                  await page.waitForTimeout(1500)
+                  const reloaded = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, mode: document.documentElement.dataset.hermesMode, stored: localStorage.getItem('hermes-desktop-theme-v2') }))
+                  console.log('PAPER-RELOAD ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(reloaded))
+                  expect(reloaded.attr).toBe(other)
+                  expect(reloaded.stored).toBe(other)
+                  expect(reloaded.mode).toBe(mode)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-after-reload-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                } else {
+                  console.log('PAPER-SCENE ' + mode + ' settings button not found')
+                }
+              })
+            })
+          }
+          TS
+      - name: Build, then Paper screenshots
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          PAPER_SHOTS_DIR: /tmp/paper-shots
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
+            echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
+          fi
+          export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          pnpm run build
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-paper-visual.spec.ts --reporter=list --retries=0
+      - name: List screenshots (PNG files only are uploaded)
+        if: always()
+        run: ls -la /tmp/paper-shots || true
+      - name: Upload Paper screenshots (synthetic mock-backend UI only, no config, env or traces)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: paper-visual-screenshots
+          path: /tmp/paper-shots/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  verdict:
+    name: Overall result (scope-aware; says SCOPED when the run was not full)
+    needs: [scope, static, unit, unit-scoped, e2e, e2e-scoped]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Summarize and decide
+        env:
+          SCOPE: ${{ needs.scope.outputs.scope }}
+          REASON: ${{ needs.scope.outputs.reason }}
+          FILES: ${{ needs.scope.outputs.files }}
+          R_SCOPE: ${{ needs.scope.result }}
+          R_STATIC: ${{ needs.static.result }}
+          R_UNIT: ${{ needs.unit.result }}
+          R_UNIT_S: ${{ needs.unit-scoped.result }}
+          R_E2E: ${{ needs.e2e.result }}
+          R_E2E_S: ${{ needs.e2e-scoped.result }}
+        run: |
+          echo "scope=$SCOPE ($R_SCOPE) reason: $REASON"
+          echo "static=$R_STATIC unit=$R_UNIT unit-scoped=$R_UNIT_S e2e=$R_E2E e2e-scoped=$R_E2E_S"
+          if [ "$R_SCOPE" != success ] || [ "$R_STATIC" != success ]; then echo "RESULT: FAILED (scope or static did not succeed)"; exit 1; fi
+          if [ "$SCOPE" = full ]; then
+            if [ "$R_UNIT" = success ] && [ "$R_E2E" = success ] && [ "$R_UNIT_S" = skipped ] && [ "$R_E2E_S" = skipped ]; then echo "RESULT: FULL PASS (static, all unit shards, full E2E)"; exit 0; fi
+            echo "RESULT: FULL RUN FAILED (unit=$R_UNIT e2e=$R_E2E)"; exit 1
+          fi
+          if [ "$SCOPE" = theme ]; then
+            if [ "$R_UNIT_S" = success ] && [ "$R_E2E_S" = success ] && [ "$R_UNIT" = skipped ] && [ "$R_E2E" = skipped ]; then
+              echo "RESULT: SCOPED CHECKS PASSED. This is NOT a full pass. Palette-only change ($FILES). Ran: lint, typecheck, vitest related, and 5 E2E specs (boot, sidebar-states, markdown-overflow, sticky-prompt-clip, group-room-native). Skipped: full unit suite and the other E2E specs. Executed-test outcome is separate from any baseline comparison."
+              exit 0
+            fi
+            echo "RESULT: SCOPED CHECKS FAILED (unit-scoped=$R_UNIT_S e2e-scoped=$R_E2E_S)"; exit 1
+          fi
+          echo "RESULT: FAILED (unknown scope)"; exit 1

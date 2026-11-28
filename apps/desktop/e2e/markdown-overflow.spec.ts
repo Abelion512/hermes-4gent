@@ -1,21 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { type NoProviderFixture, setupNoProvider } from './fixtures'
+import { rendererCss } from './renderer-css'
 import { expect, test } from './test'
 
 const LONG_TOKEN = 'x'.repeat(500)
-
-function rendererCss(): string {
-  const assetsDir = path.resolve(import.meta.dirname, '..', 'dist', 'assets')
-  const stylesheet = fs.readdirSync(assetsDir).find(file => /^index-.*\.css$/.test(file))
-
-  if (!stylesheet) {
-    throw new Error(`Desktop renderer stylesheet not found in ${assetsDir}`)
-  }
-
-  return fs.readFileSync(path.join(assetsDir, stylesheet), 'utf8')
-}
 
 let fixture: NoProviderFixture | null = null
 
@@ -39,13 +26,16 @@ test('constrains prose while tables and code scroll inside their own cards', asy
       style="width: 320px"
     >
       <p class="wrap-anywhere">${LONG_TOKEN}</p>
+      <!-- Cells carry no wrap-anywhere: markdown-table.tsx only adds that
+           class in user-resized table-fixed mode, and a wrapped token would
+           fit the column, leaving nothing to scroll. -->
       <div class="aui-md-table my-2 max-w-full overflow-x-auto">
         <table class="m-0 w-full min-w-[18rem] border-collapse">
           <thead>
-            <tr><th class="wrap-anywhere">Header with a long value</th><th>Other</th></tr>
+            <tr><th>Header with a long value</th><th>Other</th></tr>
           </thead>
           <tbody>
-            <tr><td class="wrap-anywhere">${LONG_TOKEN}</td><td>value</td></tr>
+            <tr><td>${LONG_TOKEN}</td><td>value</td></tr>
           </tbody>
         </table>
       </div>
