@@ -509,12 +509,14 @@ def disarm_after_teardown(done_event: threading.Event, shutdown_event: Optional[
     gets ``_stop_guard_entered``, so a caller can tell a failure this guard logged from one before it."""
     if owner is not None:
         owner._stop_guard_entered = True
+    disarm = False
     try:
         yield
+        disarm = True
     except Exception:
         if shutdown_event is not None and shutdown_event.is_set():
             logger.exception("Gateway stop failed after the shutdown began; the shutdown tail still runs")
-            done_event.set()
+            disarm = True
         else:
             logger.exception("Gateway stop failed; the shutdown watchdog stays armed to force the exit")
         raise
@@ -522,7 +524,9 @@ def disarm_after_teardown(done_event: threading.Event, shutdown_event: Optional[
         logger.warning("Gateway stop interrupted (%s); the shutdown watchdog stays armed to force the exit",
                        type(exc).__name__)
         raise
-    done_event.set()
+    finally:
+        if disarm:
+            done_event.set()
 
 
 async def _tick_socket_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:

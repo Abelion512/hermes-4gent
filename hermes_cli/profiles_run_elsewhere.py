@@ -532,7 +532,7 @@ def mark_profile_run_elsewhere(profile: str, plugin: str, *, root: str | Path | 
     if os.name == "posix":
         # Host services that run as another local user must be able to list it: a permission
         # error reads as "this process is the backend running elsewhere" and refuses nothing.
-        os.chmod(folder, 0o755)  # NOSONAR: cross-user listing needs r-x for group/other; only the owner can write, and the markers hold no secrets
+        os.chmod(folder, 0o755)  # NOSONAR: cross-user listing needs 0755; no write bits and no secrets
     current = _read_entry(folder, name) if name in _read_folder(folder).names else None
     if current is None:
         if _publish_new(path, {"plugin": plugin, "since": now}):

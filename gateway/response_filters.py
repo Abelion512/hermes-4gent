@@ -78,7 +78,7 @@ def _strip_bracket_padding(text: str) -> str:
     brackets: the space between a marker and the note after it (``[SILENT] nothing new``) and
     any bracketed word that is not a marker are untouched, so prose stays prose.
     """
-    return re.sub(r"\s+\]", "]", re.sub(r"\[\s+", "[", text))
+    return re.sub(r"\s++\]", "]", re.sub(r"\[\s+", "[", text))
 
 
 def _canonical_silence_candidate(text: str) -> str:
@@ -210,7 +210,7 @@ def _strip_leading_code_span(text: str) -> str:
 
 # One bracketed token and nothing else: ``[`` + any non-space run + optional ``]``. Anything with
 # a second word fails this shape, so a damaged marker followed by prose is always delivered.
-_DAMAGED_MARKER_SHAPE = re.compile(r"\[\s*([^\s\[\]]*)\s*(\]?)")
+_DAMAGED_MARKER_SHAPE = re.compile(r"\[\s*+([^\s\[\]]*+)\s*+(\]?)")
 _SILENT_LETTERS = "silent"
 
 

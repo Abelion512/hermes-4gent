@@ -23,7 +23,7 @@ from typing import Optional
 from xml.etree import ElementTree
 
 _TASK_NS = "{http://schemas.microsoft.com/windows/2004/02/mit/task}"
-_TASK_HEADER = re.compile(r"<!--\s*(\\[^>]*?)\s*-->")
+_TASK_HEADER = re.compile(r"<!--\s*(\\[^>]*)(?<=\S)\s*-->")
 _XML_DECL = re.compile(r"<\?xml[^>]*\?>")
 _STARTUP_SUFFIXES = (".lnk", ".cmd", ".bat", ".vbs", ".ps1")
 
