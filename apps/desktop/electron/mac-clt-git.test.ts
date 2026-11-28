@@ -19,7 +19,6 @@ const jsUnsafeCharMap: Record<string, string> = {
   '<': '\\u003C',
   '>': '\\u003E',
   '/': '\\u002F',
-  '\\': '\\\\',
   '\b': '\\b',
   '\f': '\\f',
   '\n': '\\n',
@@ -30,8 +29,10 @@ const jsUnsafeCharMap: Record<string, string> = {
   '\u2029': '\\u2029'
 }
 
+// Backslash is not in the map on purpose: the input is JSON.stringify output, which already
+// escapes every backslash; escaping it here again would double it.
 const escapeUnsafeJsChars = (value: string): string =>
-  value.replace(/[<>/\\\b\f\n\r\t\0\u2028\u2029]/g, ch => jsUnsafeCharMap[ch] ?? ch)
+  value.replace(/[<>/\b\f\n\r\t\0\u2028\u2029]/g, ch => jsUnsafeCharMap[ch] ?? ch)
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
