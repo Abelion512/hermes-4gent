@@ -42,7 +42,7 @@ if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
     exit 0
 fi
 
-if [ "$NO_PUSH" = "1" ]; then
+if [[ "$NO_PUSH" = "1" ]]; then
     # termux_build.sh pulls the image and reads RepoDigests[0]; a job-local tag
     # has neither. Falling back to the digest-pinned base image works on both
     # current and pre-claim checkouts because termux_build.sh provisions the
