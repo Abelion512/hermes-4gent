@@ -17,7 +17,11 @@ export const SHIKI_THEME = { dark: 'github-dark-dimmed', light: 'github-light-de
  * leave it untouched. Keyed per theme name so the bump only applies in light.
  */
 export const SHIKI_COLOR_REPLACEMENTS: Record<string, Record<string, string>> = {
-  'github-light-default': { '#6e7781': '#57606a' }
+  'github-light-default': {
+    '#6e7781': '#4a525b',
+    '#cf222e': '#a40e26',
+    '#8250df': '#6639ba'
+  }
 }
 
 /**
