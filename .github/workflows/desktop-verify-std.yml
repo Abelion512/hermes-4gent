@@ -1,9 +1,5 @@
 name: Desktop verify (standard runners)
 
-# TEMPORARY LIMITED PROBE COMMIT: only the e2e-probe jobs (theme branch and true base) run here (no static, no unit shards, no verdict). It is a
-# diagnostic of the failure classes from run 8, NOT a verdict and NOT a pass. The full validation file (v10) is restored
-# in the next push once the causes are fixed.
-
 # Draft. No cache saves, no artifacts, no secrets. Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
 # Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
 on:
@@ -20,22 +16,85 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-probe:
-    name: LIMITED PROBE, selected E2E specs, not a verdict
+  static:
+    name: Lint and typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Record the exact source tested
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Record the checked SHA
         run: |
-          echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
-          git diff --stat 47778138a87770dfa336c9c83b77d40e1e3c6d03 HEAD -- . ':!.github' 2>&1 | tail -4 || true
+          echo "PR head: ${{ github.event.pull_request.head.sha }}"
+          echo "Checked out: $(git rev-parse HEAD)"
+          git log --oneline -3
+          git diff --stat origin/${{ github.base_ref }}...HEAD || true
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: ESLint
+        working-directory: apps/desktop
+        run: pnpm run lint
+      - name: Typecheck
+        working-directory: apps/desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm run typecheck
+
+  unit:
+    name: Unit tests (ui project, shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Unit tests (shard ${{ matrix.shard }}/4 of the ui project)
+        working-directory: apps/desktop
+        run: pnpm exec vitest run --project ui --shard=${{ matrix.shard }}/4
+
+  e2e:
+    name: Build and Playwright E2E (Electron under xvfb)
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Electron system libraries
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
       - uses: ./.github/actions/setup-pm
         with:
           toolchain: all
@@ -46,63 +105,76 @@ jobs:
           save-python-cache: 'false'
       - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
         run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
       - name: Prepare locked Electron runtime
         run: node scripts/build/electron-runtime.mjs --source .
-      - name: Inspect the PM Python environment against what the specs expect
-        run: |
-          set +e
-          echo "PROBE-ENV HERMES_PYTHON=${HERMES_PYTHON:-unset} VIRTUAL_ENV=${VIRTUAL_ENV:-unset}"
-          ls -d .venv venv 2>&1 | head -2
-          (cd /tmp && "$HERMES_PYTHON" -c "import sys, hermes_cli; print('PROBE-ENV python', sys.version.split()[0], 'hermes_cli at', hermes_cli.__file__)") 2>&1 | head -3
-          (cd "$GITHUB_WORKSPACE" && "$HERMES_PYTHON" -c "import hermes_cli; print('PROBE-ENV from repo cwd hermes_cli at', hermes_cli.__file__)") 2>&1 | head -3
-          ls "$VIRTUAL_ENV/bin" | grep -i hermes | head -5 | sed 's/^/PROBE-ENV bin: /'
-          "$VIRTUAL_ENV/bin/pip" list 2>/dev/null | grep -i hermes | sed 's/^/PROBE-ENV pip: /' || "$HERMES_PYTHON" -m pip list 2>/dev/null | grep -i hermes | sed 's/^/PROBE-ENV pip: /' || true
       - name: Link the PM environment at the repo path the specs hardcode (CI checkout only)
         run: |
           if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
           test -x .venv/bin/python
-          ls -l .venv | head -1
-      - name: Build, then run the selected specs (no retries, probe only)
+      - name: Record the exact source tested
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
+      - name: Build, then Playwright E2E
         working-directory: apps/desktop
         env:
           CI: 'true'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/pw-results.json
+          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
+          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
+          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
           NOUS_API_KEY: ''
         run: |
-          set +e
           if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
             echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
           fi
           export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
           pnpm run build
-          echo "PROBE-DIST dist entries:"; ls dist | head -20
-          echo "PROBE-DIST dist/assets css:"; find dist -name '*.css' | head -10
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test \
-            e2e/chat.spec.ts e2e/onboarding.spec.ts e2e/markdown-overflow.spec.ts e2e/sticky-prompt-clip.spec.ts \
-            e2e/new-bot-config-on-disk.spec.ts e2e/fleet-profile-rail.spec.ts e2e/completed-reply-refresh.spec.ts \
-            e2e/group-turn-integrity.spec.ts:118 e2e/cross-gateway-group.spec.ts:289 e2e/image-attachment-resume.spec.ts \
-            --reporter=list --retries=0
-          code=$?
-          echo "PROBE-RESULT playwright exit code $code, this probe is not a verdict"
-          exit 0
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list,json
+      - name: Per-test result list (log and job summary only, no artifact)
+        if: always()
+        run: |
+          cat > /tmp/summ.cjs <<'JS'
+          const fs = require('fs')
+          let r
+          try { r = JSON.parse(fs.readFileSync('/tmp/pw-results.json', 'utf8')) } catch (e) { console.log('RESULT-LIST no json: ' + e.message); process.exit(0) }
+          const rows = []
+          const walk = (suite, file) => {
+            for (const sp of suite.specs || []) for (const t of sp.tests || []) {
+              const last = (t.results || []).slice(-1)[0] || {}
+              rows.push((t.status || last.status || '?') + ' | ' + (sp.file || file) + ':' + sp.line + ' | ' + (sp.title || '').slice(0, 110))
+            }
+            for (const c of suite.suites || []) walk(c, suite.file || file)
+          }
+          for (const s of r.suites || []) walk(s, s.file)
+          rows.sort()
+          const out = rows.map((x) => 'RESULT-LIST ' + x).join('\n')
+          console.log(out)
+          console.log('RESULT-COUNTS ' + JSON.stringify(r.stats || {}))
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Per-test E2E results\n```\n' + rows.join('\n') + '\n```\n' + JSON.stringify(r.stats || {}) + '\n')
+          JS
+          node /tmp/summ.cjs
 
-  e2e-probe-base:
-    name: LIMITED PROBE on the true base 47778138, same specs, not a verdict
+  e2e-base:
+    name: COMPARISON ONLY, true-base full E2E, not a verdict input
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           ref: 47778138a87770dfa336c9c83b77d40e1e3c6d03
           persist-credentials: false
-      - name: Record the base commit and its diff to the PR code
-        run: |
-          echo "PROBE-SRC HEAD=$(git rev-parse HEAD) (true base)"
       - name: Electron system libraries
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
       - uses: ./.github/actions/setup-pm
         with:
           toolchain: all
@@ -113,26 +185,26 @@ jobs:
           save-python-cache: 'false'
       - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
         run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
       - name: Prepare locked Electron runtime
         run: node scripts/build/electron-runtime.mjs --source .
-      - name: Inspect the PM Python environment against what the specs expect
-        run: |
-          set +e
-          echo "PROBE-ENV HERMES_PYTHON=${HERMES_PYTHON:-unset} VIRTUAL_ENV=${VIRTUAL_ENV:-unset}"
-          ls -d .venv venv 2>&1 | head -2
-          (cd /tmp && "$HERMES_PYTHON" -c "import sys, hermes_cli; print('PROBE-ENV python', sys.version.split()[0], 'hermes_cli at', hermes_cli.__file__)") 2>&1 | head -3
-          (cd "$GITHUB_WORKSPACE" && "$HERMES_PYTHON" -c "import hermes_cli; print('PROBE-ENV from repo cwd hermes_cli at', hermes_cli.__file__)") 2>&1 | head -3
-          ls "$VIRTUAL_ENV/bin" | grep -i hermes | head -5 | sed 's/^/PROBE-ENV bin: /'
-          "$VIRTUAL_ENV/bin/pip" list 2>/dev/null | grep -i hermes | sed 's/^/PROBE-ENV pip: /' || "$HERMES_PYTHON" -m pip list 2>/dev/null | grep -i hermes | sed 's/^/PROBE-ENV pip: /' || true
       - name: Link the PM environment at the repo path the specs hardcode (CI checkout only)
         run: |
           if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
           test -x .venv/bin/python
-          ls -l .venv | head -1
-      - name: Build, then run the selected specs (no retries, probe only)
+      - name: Record the exact source tested
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) (true base)"
+      - name: Build, then Playwright E2E
         working-directory: apps/desktop
         env:
           CI: 'true'
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/pw-results.json
+          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
+          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
+          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
           NOUS_API_KEY: ''
@@ -142,14 +214,43 @@ jobs:
             echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
           fi
           export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
           pnpm run build
-          echo "PROBE-DIST dist entries:"; ls dist | head -20
-          echo "PROBE-DIST dist/assets css:"; find dist -name '*.css' | head -10
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test \
-            e2e/chat.spec.ts e2e/onboarding.spec.ts e2e/markdown-overflow.spec.ts e2e/sticky-prompt-clip.spec.ts \
-            e2e/new-bot-config-on-disk.spec.ts e2e/fleet-profile-rail.spec.ts e2e/completed-reply-refresh.spec.ts \
-            e2e/group-turn-integrity.spec.ts:118 e2e/cross-gateway-group.spec.ts:289 e2e/image-attachment-resume.spec.ts \
-            --reporter=list --retries=0
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list,json
           code=$?
-          echo "PROBE-RESULT playwright exit code $code, this probe is not a verdict"
+          echo "PROBE-RESULT base playwright exit code $code, comparison only, not a verdict"
           exit 0
+      - name: Per-test result list (log and job summary only, no artifact)
+        if: always()
+        run: |
+          cat > /tmp/summ.cjs <<'JS'
+          const fs = require('fs')
+          let r
+          try { r = JSON.parse(fs.readFileSync('/tmp/pw-results.json', 'utf8')) } catch (e) { console.log('RESULT-LIST no json: ' + e.message); process.exit(0) }
+          const rows = []
+          const walk = (suite, file) => {
+            for (const sp of suite.specs || []) for (const t of sp.tests || []) {
+              const last = (t.results || []).slice(-1)[0] || {}
+              rows.push((t.status || last.status || '?') + ' | ' + (sp.file || file) + ':' + sp.line + ' | ' + (sp.title || '').slice(0, 110))
+            }
+            for (const c of suite.suites || []) walk(c, suite.file || file)
+          }
+          for (const s of r.suites || []) walk(s, s.file)
+          rows.sort()
+          const out = rows.map((x) => 'RESULT-LIST ' + x).join('\n')
+          console.log(out)
+          console.log('RESULT-COUNTS ' + JSON.stringify(r.stats || {}))
+          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Per-test E2E results\n```\n' + rows.join('\n') + '\n```\n' + JSON.stringify(r.stats || {}) + '\n')
+          JS
+          node /tmp/summ.cjs
+
+  verdict:
+    name: Overall result (requires static, all unit shards and E2E)
+    needs: [static, unit, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} e2e=${{ needs.e2e.result }}"
+          test "${{ needs.static.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.e2e.result }}" = success
