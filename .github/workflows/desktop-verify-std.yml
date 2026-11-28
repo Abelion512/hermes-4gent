@@ -436,8 +436,7 @@ jobs:
             return m ? longReply(Number(m[1])) : 'Hello from the mock inference server! The full boot chain is working.'
           }
 
-          // Native Nous Dark verification: the user chose Nous; no palette change, Paper is not re-run here.
-          for (const theme of ['nous'] as const) for (const mode of ['dark'] as const) {
+          for (const theme of ['paper', 'paper-warm'] as const) for (const mode of ['light', 'dark'] as const) {
             test.describe(`${theme} ${mode}`, () => {
               let fx: MockBackendFixture | null = null
 
@@ -482,7 +481,21 @@ jobs:
                     const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
                     console.log('PAPER-VIEWPORT ' + mode + ' ' + scene + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
                     await page.screenshot({ path: `${OUT}/${theme}-${mode}-${scene}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                    if (size.label.startsWith('desktop')) await snap(scene)
                   }
+                }
+
+                const snap = async (scene: string): Promise<void> => {
+                  // Static DOM snapshot of the real renderer: live DOM plus the CSS rules the page actually uses. For a private preview file only.
+                  const html = await page.evaluate(() => {
+                    const css = Array.from(document.styleSheets).map((sheet) => { try { return Array.from(sheet.cssRules).map((r) => r.cssText).join('\n') } catch { return '' } }).join('\n')
+                    const root = document.documentElement.cloneNode(true) as HTMLElement
+                    root.querySelectorAll('script, link[rel="stylesheet"], link[rel="modulepreload"], link[rel="preload"], style').forEach((el) => el.remove())
+                    const head = root.querySelector('head') || root.insertBefore(document.createElement('head'), root.firstChild)
+                    const st = document.createElement('style'); st.setAttribute('data-snap-css', '1'); st.textContent = css; head.appendChild(st)
+                    return '<!doctype html>' + root.outerHTML
+                  })
+                  fs.writeFileSync(`${OUT}/${theme}-${mode}-${scene}.snap.html`, html)
                 }
 
                 const send = async (text: string, done: string): Promise<void> => {
@@ -516,36 +529,6 @@ jobs:
 
                 await send('PAPER_MD please show the markdown fixture', 'END-OF-MD-FIXTURE')
                 await shotBoth('markdown')
-
-                // Boundaries (computed): border colour and width vs the parent surface, and fill vs the parent surface, for the markdown frame.
-                console.log('PAPER-BOUNDS ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
-                  const cv = document.createElement('canvas'); cv.width = 1; cv.height = 1
-                  const ctx = cv.getContext('2d', { willReadFrequently: true })!
-                  const rgba = (c: string): number[] => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; const a = d[3] / 255; return a === 0 ? [0, 0, 0, 0] : [Math.round(d[0] * 255 / d[3]), Math.round(d[1] * 255 / d[3]), Math.round(d[2] * 255 / d[3]), a] }
-                  const over = (fg: number[], bg: number[]): number[] => { const a = fg[3] + bg[3] * (1 - fg[3]); return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map((i) => (fg[i] * fg[3] + bg[i] * bg[3] * (1 - fg[3])) / a).concat([a]) }
-                  const lin = (v: number): number => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4) }
-                  const lum = (c: number[]): number => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
-                  const ratio = (a: number[], b: number[]): number => { const l1 = lum(a); const l2 = lum(b); return Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 }
-                  const surface = (start: Element | null): number[] => { const chain: Element[] = []; for (let e = start; e; e = e.parentElement) chain.push(e); let bg = [0, 0, 0, 1]; for (const e of chain.reverse()) { const c = rgba(getComputedStyle(e).backgroundColor); if (c[3] > 0) bg = over(c, bg) } return bg }
-                  const measure = (label: string, el: Element | null) => {
-                    if (!el) return { label, found: false }
-                    const cs = getComputedStyle(el)
-                    const parent = surface(el.parentElement)
-                    const own = over(rgba(cs.backgroundColor), parent)
-                    const bc = over(rgba(cs.borderTopColor), parent)
-                    return { label, found: true, borderW: cs.borderTopWidth, borderColor: cs.borderTopColor, borderVsParent: parseFloat(cs.borderTopWidth) > 0 ? ratio(bc, parent) : 'no-border', fillVsParent: ratio(own, parent), parentRgb: parent.slice(0, 3).map((v) => Math.round(v)), fillRgb: own.slice(0, 3).map((v) => Math.round(v)) }
-                  }
-                  const cards = Array.from(document.querySelectorAll('[data-slot="code-card"]'))
-                  return [
-                    measure('code-card', cards[cards.length - 1] || null),
-                    measure('md-table', document.querySelector('.aui-md-table')),
-                    measure('md-table-th', document.querySelector('.aui-md-table th')),
-                    measure('md-table-td', document.querySelector('.aui-md-table td')),
-                    measure('blockquote', document.querySelector('.aui-md blockquote')),
-                    measure('composer-surface', document.querySelector('[data-slot="composer-surface"]')),
-                    measure('composer-root', document.querySelector('[data-slot="composer-root"]'))
-                  ]
-                })))
                 // Diagnostic: every pre in the last code card at the narrow width, plus a real scroll attempt (computed values and scrollLeft read-back).
                 console.log('PAPER-CODE ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(async () => {
                   const card = Array.from(document.querySelectorAll('[data-slot="code-card"]')).slice(-1)[0]
@@ -593,7 +576,7 @@ jobs:
                   await page.waitForTimeout(500)
                   console.log('PAPER-VIEWPORT ' + mode + ' dropdown-open actual ' + JSON.stringify(await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-dropdown-open-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
-                  console.log('PAPER-CONTROLS ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => Array.from(document.querySelectorAll('input, [role="combobox"], [role="listbox"], [role="option"]')).filter((el) => (el as HTMLElement).offsetParent !== null).slice(0, 8).map((el) => { const cs = getComputedStyle(el); return { tag: el.tagName, role: el.getAttribute('role'), label: (el.getAttribute('aria-label') || el.textContent || '').slice(0, 24), borderW: cs.borderTopWidth, border: cs.borderTopColor, bg: cs.backgroundColor, outline: cs.outlineStyle + ' ' + cs.outlineColor } }))))
+                  await snap('dropdown-open')
                   await page.keyboard.press('Escape')
                   await page.waitForTimeout(400)
                   await page.keyboard.press('Tab')
@@ -613,15 +596,16 @@ jobs:
                   await page.waitForTimeout(1200)
                   await page.getByRole('button', { name: 'Appearance', exact: true }).click({ timeout: 15000 })
                   await page.getByRole('button', { name: 'Theme', exact: true }).click({ timeout: 15000 })
-                  await page.getByPlaceholder(/Search your themes/).fill('Nous')
-                  const grayCard = page.getByRole('button', { name: /Nous/ }).first()
-                  const warmCard = grayCard
+                  await page.getByPlaceholder(/Search your themes/).fill('Paper')
+                  const grayCard = page.getByRole('button', { name: /Paper Gray/ })
+                  const warmCard = page.getByRole('button', { name: /Paper Warm/ })
                   await expect(grayCard).toBeVisible({ timeout: 15000 })
                   await expect(warmCard).toBeVisible({ timeout: 15000 })
                   await page.waitForTimeout(800)
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-before-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
-                  const other = 'nous' as string // re-select the native Nous card (no palette change)
-                  await grayCard.click()
+                  await snap('selector-before')
+                  const other = theme === 'paper' ? 'paper-warm' : 'paper'
+                  await (other === 'paper' ? grayCard : warmCard).click()
                   await page.waitForTimeout(1200)
                   const after = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, stored: localStorage.getItem('hermes-desktop-theme-v2'), bodyBg: getComputedStyle(document.body).backgroundColor }))
                   console.log('PAPER-SELECTOR ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(after))
@@ -658,6 +642,7 @@ jobs:
                     })
                   })))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-inputs-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await snap('inputs')
                   // Persistence across a real reload (boot reads the stored pick; the seed no longer overwrites it).
                   // Settings is an overlay that a reload restores from the hash route, and it covers the composer, so
                   // waitForAppReady (composer hit-test) cannot pass here. Poll the persisted theme state instead.
@@ -704,9 +689,6 @@ jobs:
           fi
           export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
           pnpm run build
-          echo "BUILD-LAYOUT dist top: $(ls dist 2>&1 | tr '\n' ' ')"
-          echo "BUILD-LAYOUT dist/assets css: $(ls dist/assets 2>&1 | grep -i '\.css' | head -10 | tr '\n' ' ')"
-          echo "BUILD-LAYOUT any css under dist: $(find dist -name '*.css' 2>/dev/null | head -10 | tr '\n' ' ')"
           xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-paper-visual.spec.ts --reporter=list --retries=0
       - name: List screenshots (PNG files only are uploaded)
         if: always()
@@ -716,7 +698,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: paper-visual-screenshots
-          path: /tmp/paper-shots/*.png
+          path: |
+            /tmp/paper-shots/*.png
+            /tmp/paper-shots/*.snap.html
           if-no-files-found: warn
           retention-days: 7
 
