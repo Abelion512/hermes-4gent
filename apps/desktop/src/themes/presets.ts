@@ -441,85 +441,7 @@ export const slateTheme: DesktopTheme = {
   }
 }
 
-/**
- * Paper - dimmed warm gray-brown paper (no near-white surfaces) with a terracotta accent, lifted from the
- * headphone-showdown reference page the user picked. Broad surfaces sit on the
- * paper tone so long sessions stay low-glare; every text pair is WCAG AA+. Ships a dimmed light and a dark palette.
- * Tokens without a reference source are marked derived.
- */
-const PAPER_LIGHT_COLORS: DesktopThemeColors = {
-  background: '#B4B0A6', // dimmed warm gray-brown paper; no surface approaches white
-  foreground: '#191816',
-  card: '#BDB9AF',
-  cardForeground: '#191816',
-  muted: '#B8B1A3', // derived: one step darker than the paper tone
-  mutedForeground: '#25241F',
-  popover: '#BDB9AF',
-  popoverForeground: '#191816',
-  primary: '#5A2416',
-  primaryForeground: '#FFFFFF', // derived: reference has no buttons
-  secondary: '#BFB0A3',
-  secondaryForeground: '#514D46',
-  accent: '#BFB0A3',
-  accentForeground: '#5A2416',
-  border: '#8F8B82',
-  input: '#8F8B82',
-  ring: '#5A2416',
-  midground: '#5A2416',
-  destructive: '#5A2416', // derived: dark accent doubles as the danger hue
-  destructiveForeground: '#FFFFFF',
-  sidebarBackground: '#B8B1A3', // derived: reference page has no sidebar
-  sidebarBorder: '#8F8B82',
-  userBubble: '#BFB0A3', // derived: reference has no chat UI
-  userBubbleBorder: '#A39587'
-}
-
-/** Dark counterpart: same warm terracotta family on a dim rose-black canvas. */
-const PAPER_DARK_COLORS: DesktopThemeColors = {
-  background: '#1E1819',
-  foreground: '#EFE4E3',
-  card: '#272021',
-  cardForeground: '#EFE4E3',
-  muted: '#221C1D',
-  mutedForeground: '#AD9FA0',
-  popover: '#272021',
-  popoverForeground: '#EFE4E3',
-  primary: '#D9887A',
-  primaryForeground: '#241611',
-  secondary: '#3A2A2B',
-  secondaryForeground: '#E3D6D5',
-  accent: '#3A2A2B',
-  accentForeground: '#EBA39A',
-  border: '#3D3031',
-  input: '#3D3031',
-  ring: '#D9887A',
-  midground: '#D9887A',
-  destructive: '#D0705F',
-  destructiveForeground: '#241611',
-  sidebarBackground: '#221C1D',
-  sidebarBorder: '#3D3031',
-  userBubble: '#3A2A2B',
-  userBubbleBorder: '#4D3A3B'
-}
-
-export const paperTheme: DesktopTheme = {
-  name: 'paper',
-  label: 'Paper',
-  description: 'Warm paper and terracotta, low-glare for long sessions',
-  colors: PAPER_LIGHT_COLORS,
-  // Declaring darkColors marks this a both-modes skin so paletteFor never
-  // routes paper through synthLightColors(). Light mode paints the dimmed warm
-  // paper palette, dark mode paints the dim warm dark palette, chosen by the
-  // native Light / Dark / System mode control.
-  darkColors: PAPER_DARK_COLORS,
-  typography: {
-    fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
-    fontMono: SYSTEM_MONO
-  },
-  // The design defaults paint chat bubbles, text inputs and elevated surfaces
-  // near-white regardless of the skin's seeds, so claim them here, per mode.
-  // Scoped to this skin: customCSS is injected only while paper is active.
-  customCSS:
+const PAPER_GRAY_CSS =
     ':root{' +
     '--ui-chat-bubble-background:var(--theme-bubble-seed);' +
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
@@ -557,7 +479,131 @@ export const paperTheme: DesktopTheme = {
     'html:not(.dark) .aui-shiki span[style*="#0550ae"]{color:#044699 !important;}' +
     'html:not(.dark) .aui-shiki span[style*="#953800"]{color:#833100 !important;}' +
     'html:not(.dark) .aui-shiki span[style*="#116329"]{color:#0E5724 !important;}' +
+    // Paper dark code: lift the dim comment token (github-dark-dimmed #768390) for the dark code panel (Paper only).
+    'html.dark .aui-shiki span[style*="#768390" i]{color:#9AA7B3 !important;}' +
     'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 80%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;}'
+
+// Paper Warm: the earlier, warmer light palette. Same structure as Paper Gray with its
+// surface, accent and code-token colors swapped; the dark rules are identical.
+const PAPER_WARM_CSS = PAPER_GRAY_CSS.replaceAll('#BDB9AF', '#CCC5B8')
+  .replaceAll('#C4C0B6', '#D3CDC0')
+  .replaceAll('#5A2416', '#6E3020')
+  .replaceAll('#901720', '#8F0B20')
+  .replaceAll('#583697', '#5A32A3')
+  .replaceAll('#191816 80%', '#191816 70%')
+  .replace('html:not(.dark) .aui-shiki span[style*="#0550ae"]{color:#044699 !important;}', '')
+  .replace('html:not(.dark) .aui-shiki span[style*="#953800"]{color:#833100 !important;}', '')
+  .replace('html:not(.dark) .aui-shiki span[style*="#116329"]{color:#0E5724 !important;}', '')
+
+/**
+ * Paper - dimmed warm gray-brown paper (no near-white surfaces) with a terracotta accent, lifted from the
+ * headphone-showdown reference page the user picked. Broad surfaces sit on the
+ * paper tone so long sessions stay low-glare; every text pair is WCAG AA+. Ships a dimmed light and a dark palette.
+ * Tokens without a reference source are marked derived.
+ */
+const PAPER_LIGHT_COLORS: DesktopThemeColors = {
+  background: '#B4B0A6', // dimmed warm gray-brown paper; no surface approaches white
+  foreground: '#191816',
+  card: '#BDB9AF',
+  cardForeground: '#191816',
+  muted: '#B8B1A3', // derived: one step darker than the paper tone
+  mutedForeground: '#25241F',
+  popover: '#BDB9AF',
+  popoverForeground: '#191816',
+  primary: '#5A2416',
+  primaryForeground: '#FFFFFF', // derived: reference has no buttons
+  secondary: '#BFB0A3',
+  secondaryForeground: '#514D46',
+  accent: '#BFB0A3',
+  accentForeground: '#5A2416',
+  border: '#8F8B82',
+  input: '#8F8B82',
+  ring: '#5A2416',
+  midground: '#5A2416',
+  destructive: '#5A2416', // derived: dark accent doubles as the danger hue
+  destructiveForeground: '#FFFFFF',
+  sidebarBackground: '#B8B1A3', // derived: reference page has no sidebar
+  sidebarBorder: '#8F8B82',
+  userBubble: '#BFB0A3', // derived: reference has no chat UI
+  userBubbleBorder: '#A39587'
+}
+
+/** Dark counterpart: same warm terracotta family on a dim rose-black canvas. */
+const PAPER_WARM_LIGHT_COLORS: DesktopThemeColors = {
+  ...PAPER_LIGHT_COLORS,
+  background: '#C2BBAD',
+  card: '#CCC5B8',
+  mutedForeground: '#3E3A34',
+  popover: '#CCC5B8',
+  primary: '#6E3020',
+  secondary: '#CEBBAC',
+  accent: '#CEBBAC',
+  accentForeground: '#6E3020',
+  border: '#A59E8F',
+  input: '#A59E8F',
+  ring: '#6E3020',
+  midground: '#6E3020',
+  destructive: '#6E3020',
+  sidebarBorder: '#A59E8F',
+  userBubble: '#CEBBAC',
+  userBubbleBorder: '#B39F8F'
+}
+
+const PAPER_DARK_COLORS: DesktopThemeColors = {
+  background: '#161616',
+  foreground: '#F0F0F0',
+  card: '#202020',
+  cardForeground: '#F0F0F0',
+  muted: '#1B1B1B',
+  mutedForeground: '#B4B4B4',
+  popover: '#202020',
+  popoverForeground: '#F0F0F0',
+  primary: '#D9887A',
+  primaryForeground: '#241611',
+  secondary: '#2E2E2E',
+  secondaryForeground: '#E6E6E6',
+  accent: '#2E2E2E',
+  accentForeground: '#EBA39A',
+  border: '#404040',
+  input: '#404040',
+  ring: '#D9887A',
+  midground: '#D9887A',
+  destructive: '#D0705F',
+  destructiveForeground: '#241611',
+  sidebarBackground: '#1B1B1B',
+  sidebarBorder: '#404040',
+  userBubble: '#2E2E2E',
+  userBubbleBorder: '#505050'
+}
+
+export const paperTheme: DesktopTheme = {
+  name: 'paper',
+  label: 'Paper Gray',
+  description: 'Dimmed gray paper and terracotta, no near-white surfaces',
+  colors: PAPER_LIGHT_COLORS,
+  // Declaring darkColors marks this a both-modes skin so paletteFor never
+  // routes paper through synthLightColors(). Light mode paints the dimmed warm
+  // paper palette, dark mode paints the dim warm dark palette, chosen by the
+  // native Light / Dark / System mode control.
+  darkColors: PAPER_DARK_COLORS,
+  typography: {
+    fontSans: '"Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif, ' + EMOJI_FALLBACK,
+    fontMono: SYSTEM_MONO
+  },
+  // The design defaults paint chat bubbles, text inputs and elevated surfaces
+  // near-white regardless of the skin's seeds, so claim them here, per mode.
+  // Scoped to this skin: customCSS is injected only while paper is active.
+  customCSS: PAPER_GRAY_CSS
+}
+
+/** Paper Warm: the earlier warm-cream light palette; shares Paper Gray's dark palette and typography. */
+export const paperWarmTheme: DesktopTheme = {
+  ...paperTheme,
+  name: 'paper-warm',
+  label: 'Paper Warm',
+  description: 'Warm cream paper and terracotta, low-glare for long sessions',
+  colors: PAPER_WARM_LIGHT_COLORS,
+  customCSS: PAPER_WARM_CSS
 }
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
@@ -573,7 +619,8 @@ export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
   mono: monoTheme,
   slate: slateTheme,
   cyberpunk: cyberpunkTheme,
-  paper: paperTheme
+  paper: paperTheme,
+  'paper-warm': paperWarmTheme
 }
 
 export const BUILTIN_THEME_LIST = Object.values(BUILTIN_THEMES)
