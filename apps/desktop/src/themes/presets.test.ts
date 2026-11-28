@@ -83,7 +83,9 @@ describe('Paper themes', () => {
   it('has no near-white light surfaces', () => {
     for (const t of [gray, warm]) {
       for (const k of ['background', 'card', 'popover', 'secondary', 'sidebarBackground', 'muted'] as const) {
-        const hex = t!.colors[k].replace('#', '')
+        const value = t!.colors[k]
+        expect(value, `${t!.name}.${k} defined`).toBeTruthy()
+        const hex = (value ?? '').replace('#', '')
         const lum = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).reduce((a, b) => a + b, 0) / 3
         expect(lum, `${t!.name}.${k}`).toBeLessThan(0.8)
       }
