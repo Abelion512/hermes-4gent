@@ -61,7 +61,7 @@ function keyedPromptStore<T extends KeyedPrompt>(): PromptStore<T> {
         if (current && !(requestId && idOf(current) !== requestId)) {
           const next = { ...all }
           delete next[key]
-          $all.set(next)
+        $all.set(}
         }
 
         return
@@ -702,4 +702,4 @@ export function clearAllPrompts(sessionId?: string | null, mode: ClearPromptsMod
   vaultUnlock.clear(sessionId)
   vaultSave.clear(sessionId)
   vaultCode.clear(sessionId)
-     }
+}
