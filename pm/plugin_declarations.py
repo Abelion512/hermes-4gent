@@ -116,6 +116,13 @@ def unsupported_requirements(specs: tuple[str, ...] | list[str]) -> tuple[str, .
     return tuple(spec for spec in specs if Requirement(spec).url)
 
 
+def _uv_table(document: Mapping) -> Mapping:
+    """``[tool.uv]`` as a mapping; a malformed scalar table reads as empty."""
+    tool = document.get("tool", {})
+    uv = tool.get("uv", {}) if isinstance(tool, Mapping) else {}
+    return uv if isinstance(uv, Mapping) else {}
+
+
 def read_python_declaration(plugin_dir: Path) -> PythonDeclaration:
     """One effective surface for consent, membership, builds and currency.
 
@@ -157,7 +164,7 @@ def read_python_declaration(plugin_dir: Path) -> PythonDeclaration:
                 requires_python = metadata.get("requires-python")
                 if requires_python is not None and not isinstance(requires_python, str):
                     raise ValueError(f"invalid project.requires-python: {project}")
-                uv = document.get("tool", {}).get("uv", {})
+                uv = _uv_table(document)
                 installs = ("build-system" in document or uv.get("package") is True
                             or any(metadata.get("optional-dependencies", {}).values())
                             or any(document.get("dependency-groups", {}).values())
@@ -197,7 +204,7 @@ def _eval_marker(marker_text: str | None, env: Mapping[str, str]) -> bool:
 
     try:
         return bool(Marker(marker_text).evaluate(env))
-    except (InvalidMarker, UndefinedComparison, UndefinedEnvironmentName):
+    except (InvalidMarker, UndefinedComparison, UndefinedEnvironmentName, ValueError, KeyError, TypeError):
         return False
 
 
@@ -447,7 +454,7 @@ def _read_site_packages_distributions(site_dir: Path) -> dict[str, frozenset[str
             except InvalidVersion:
                 continue
             found.setdefault(canonicalize_name(raw_name), set()).add(raw_version)
-    except OSError:
+    except (OSError, ValueError, TypeError, KeyError):
         return None
     return {name: frozenset(vers) for name, vers in found.items()}
 
@@ -532,7 +539,7 @@ def _pyproject_uv_sources(pyproject: Path | None) -> frozenset[str] | None:
         document = tomllib.loads(pyproject.read_text(encoding="utf-8-sig"))
     except (OSError, tomllib.TOMLDecodeError):
         return None
-    sources = document.get("tool", {}).get("uv", {}).get("sources")
+    sources = _uv_table(document).get("sources")
     if sources is None:
         return frozenset()
     if not isinstance(sources, Mapping):
@@ -549,7 +556,7 @@ def _pyproject_install_triggers(pyproject: Path | None) -> tuple[str, ...]:
     except (OSError, tomllib.TOMLDecodeError):
         return ("pyproject.toml",)
     metadata = document.get("project", {})
-    uv = document.get("tool", {}).get("uv", {})
+    uv = _uv_table(document)
     triggers: list[str] = []
     if "build-system" in document:
         triggers.append("[build-system]")
@@ -611,7 +618,7 @@ def unsatisfied_requirements(
             try:
                 if not req.marker.evaluate(env):
                     continue
-            except (UndefinedComparison, UndefinedEnvironmentName):
+            except (UndefinedComparison, UndefinedEnvironmentName, ValueError, KeyError, TypeError):
                 unsatisfied.append(spec)
                 continue
         if req.url:

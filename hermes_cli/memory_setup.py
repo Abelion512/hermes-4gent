@@ -64,7 +64,7 @@ def memory_provider_dependency_inputs(provider_name: str) -> tuple[dict, dict]:
         return {}, {}
     try:
         meta = _read_manifest_for_install(plugin_dir)
-        member = _is_member_candidate(plugin_dir)
+        member = _is_member_candidate(plugin_dir, allow_marker_skip=False)
     except (PluginOperationError, OSError, ValueError) as exc:
         raise InstallError(provider_name, str(exc)) from exc
 

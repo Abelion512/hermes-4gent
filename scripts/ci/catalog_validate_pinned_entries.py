@@ -282,15 +282,15 @@ def _check_default_venv_rebuild(
     for path_entry in (str(root), ci_dir):
         if path_entry not in sys.path:
             sys.path.append(path_entry)
-    from catalog_default_plugin_lint import check_default_plugin_venv_rebuild
-
     try:
+        from catalog_default_plugin_lint import check_default_plugin_venv_rebuild
+
         result = check_default_plugin_venv_rebuild(
             Path(plugin_dir),
             project_root=root,
             platforms=platforms or None,
         )
-    except (OSError, ValueError) as exc:
+    except Exception as exc:  # health: allow BLE001 -- an unavailable lint must warn, never break CI
         detail = str(exc).replace("\r", " ").replace("\n", " ")
         message = f"default: true plugin could not be checked for venv rebuild impact: {detail}"
         if fail_on_rebuild:

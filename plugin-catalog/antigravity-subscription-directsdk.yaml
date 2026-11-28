@@ -5,7 +5,7 @@ description: "Runs Hermes on an Antigravity subscription via the agy CLI. Suppor
 maintainer: soyelmismo
 tier: community
 category: models
-image: https://raw.githubusercontent.com/soyelmismo/hermes-antigravity-subscription/0073a2328663019f0ebb2b730cd3d6a972c706ea/assets/banner.jpg
+image: https://raw.githubusercontent.com/soyelmismo/hermes-antigravity-subscription/6e46b4632840c1b31eb5b5f8315c38f53dc71f15/assets/banner.jpg
 requires_hermes: ">=0.21.4"
 docs_url: https://github.com/soyelmismo/hermes-antigravity-subscription#readme
 version: "1.0.35"

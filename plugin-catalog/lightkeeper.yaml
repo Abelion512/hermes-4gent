@@ -9,7 +9,6 @@ requires_hermes: ">=0.22.0"
 docs_url: https://github.com/Light5566/claude-lightkeeper/blob/main/docs/agents.md#hermes-agent
 version: "2.11.1"
 title: Lightkeeper
-image: https://raw.githubusercontent.com/Light5566/claude-lightkeeper/3d107f02e570c20d11196683a1608d2fc70f1749/docs/assets/social.png
 screenshots:
   - https://raw.githubusercontent.com/Light5566/claude-lightkeeper/3d107f02e570c20d11196683a1608d2fc70f1749/docs/assets/map.png
   - https://raw.githubusercontent.com/Light5566/claude-lightkeeper/3d107f02e570c20d11196683a1608d2fc70f1749/docs/assets/gallery/lightkeeper.png

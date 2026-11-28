@@ -142,11 +142,12 @@ def test_managed_environment_keeps_ambient_path_when_git_not_installed(tmp_path,
     assert built.env["PATH"] == ambient
 
 
-def test_managed_environment_survives_unreadable_git_lookup(tmp_path, monkeypatch):
+@pytest.mark.parametrize("error", [OSError("corrupt facts"), TypeError("bad facts"), AttributeError("bad facts")])
+def test_managed_environment_survives_unreadable_git_lookup(tmp_path, monkeypatch, error):
     _uv, py = _stub_toolchain(tmp_path, monkeypatch)
     monkeypatch.setattr(
         install_module, "installed_package",
-        lambda *a, **kw: (_ for _ in ()).throw(OSError("corrupt facts")),
+        lambda *a, **kw: (_ for _ in ()).throw(error),
     )
     ambient = "/usr/bin"
     monkeypatch.setenv("PATH", ambient)

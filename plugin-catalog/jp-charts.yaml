@@ -11,7 +11,7 @@ screenshots:
   - https://raw.githubusercontent.com/TakeshiTGAL/hermes-plugin-charts/a255f2802fd91ca0a126fab570503afa3144d44d/docs/examples/monthly_sales.png
   - https://raw.githubusercontent.com/TakeshiTGAL/hermes-plugin-charts/a255f2802fd91ca0a126fab570503afa3144d44d/docs/examples/sales_mix.png
 version: 0.1.12
-image: https://raw.githubusercontent.com/TakeshiTGAL/hermes-plugin-charts/8eff93d1ea09a71975fa749116de633f1c952e88/assets/catalog-banner.png
+image: https://raw.githubusercontent.com/TakeshiTGAL/hermes-plugin-charts/a255f2802fd91ca0a126fab570503afa3144d44d/assets/catalog-banner.png
 requires_hermes: ">=0.21.4"
 platforms: []
 capabilities:

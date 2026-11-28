@@ -480,6 +480,31 @@ def test_an_automatic_cache_that_never_proved_itself_arms_nothing_for_the_reques
             db.close()
 
 
+def test_an_in_flight_budget_is_the_one_the_reply_folds_into(tmp_path):
+    """A first request of a new turn opens the turn's budget on send; its reply must reuse that
+    budget instead of opening a second one and losing the ended/spent state."""
+    with _endpoint() as (client, _server):
+        agent, warmer, run, db = _armed(tmp_path, client, sid=uuid.uuid4().hex)
+        try:
+            warmer.cancel("new turn")
+            if run is not None and run.timer is not None:
+                run.timer.cancel()
+            agent._user_turn_count = 2
+            request = _next_request(agent)
+            assert warmer.start_in_flight(request) is None
+            run = warmer._run
+            budget = run.budget
+            assert warmer._budget is budget and budget.turn == 2
+            budget.ended = True
+            reply = SimpleNamespace(usage=SimpleNamespace(
+                input_tokens=0, output_tokens=1, cache_read_input_tokens=0, cache_creation_input_tokens=0))
+            assert warmer.start(request, reply) == "warm budget spent this turn"
+            assert warmer._budget is budget
+        finally:
+            warmer.cancel()
+            db.close()
+
+
 def test_a_keep_alive_reply_landing_after_its_requests_own_reply_still_renews_the_window(tmp_path, monkeypatch):
     """The request's reply lands (and is folded, and replaces the run) while its keep-alive is still on
     the wire: the keep-alive's reply folds after it as a later read of the same prompt, so the window

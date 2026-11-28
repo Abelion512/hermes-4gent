@@ -991,6 +991,7 @@ def dashboard_install_plugin(
     deps = _pc()._python_dependency_summary(target, warnings)
     needs_python_sync = False
     if deps:
+        from pm.package import InstallError
         from pm.plugin_declarations import needs_workspace_member, read_python_declaration
         from pm.workspace import enabled_member_dirs
 
@@ -999,7 +1000,7 @@ def dashboard_install_plugin(
             needs_python_sync = needs_workspace_member(decl) or (
                 decl.installs_packages and bool(enabled_member_dirs())
             )
-        except (OSError, ValueError):
+        except (OSError, ValueError, InstallError):
             needs_python_sync = True
     kept_disabled = False
     if enable:

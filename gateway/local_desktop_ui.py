@@ -184,9 +184,10 @@ def _move_workspace(task_id, path):
     resolved = os.path.abspath(os.path.expanduser(str(path)))
     if not os.path.isdir(resolved):
         raise FileNotFoundError(f"folder does not exist: {resolved}")
-    from gateway.session_local_recovery import local_adapter_map
-    # The chat's current folder, as its last committed move published it.
-    policy = local_adapter_map(authority)[Platform.LOCAL].policies.get(live.source.chat_id)
+    from gateway.session_local_recovery import local_adapter
+    # The chat's current folder, as its last committed move published it. The adapter is lazy: a
+    # restored session may not have one in the map yet, so go through the creating helper.
+    policy = local_adapter(authority).policies.get(live.source.chat_id)
     if policy is not None and policy.source not in ("gui", "tui"):
         return None  # a CLI chat on the gateway keeps its folder: only the active project changes
     if policy is not None and os.path.realpath(policy.cwd) == os.path.realpath(resolved):
