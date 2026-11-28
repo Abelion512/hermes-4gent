@@ -33,6 +33,7 @@ from agent.gemini_urls import (
     DEFAULT_GEMINI_BASE_URL,
     VERTEX_EXPRESS_BASE_URL,
     gemini_accepts_parameters_json_schema,
+    is_gemini_studio_base_url,
     is_native_gemini_base_url,
     is_vertex_express_base_url,
     normalize_gemini_base_url,
@@ -154,10 +155,9 @@ def wrong_gemini_surface_guidance(base_url: str, api_key: str, err_status: str) 
     neither."""
     if (err_status or "").strip().upper() != "PERMISSION_DENIED":
         return ""
-    normalized = str(base_url or "").strip().lower()
-    if is_vertex_express_base_url(normalized):
+    if is_vertex_express_base_url(base_url):
         return _STUDIO_KEY_ON_EXPRESS_GUIDANCE
-    if "generativelanguage.googleapis.com" in normalized and str(api_key or "").strip().upper().startswith("AQ."):
+    if is_gemini_studio_base_url(base_url) and str(api_key or "").strip().upper().startswith("AQ."):
         return _EXPRESS_KEY_ON_STUDIO_GUIDANCE
     return ""
 

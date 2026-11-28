@@ -1,6 +1,7 @@
 """Tests for hermes_constants module."""
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -667,3 +668,65 @@ def test_is_launch_only_env_key_folds_case(name):
 @pytest.mark.parametrize("name", ["HERMES_MANAGED_DIRX", "HERMES_HOMEDIR", "PATH", ""])
 def test_is_launch_only_env_key_rejects_other_names(name):
     assert not hermes_constants.is_launch_only_env_key(name)
+
+
+class TestNamedProfilePathConfinement:
+    """A profile path must stay inside the allowlisted Hermes root, symlinks included."""
+
+    @pytest.fixture
+    def hermes_root(self, tmp_path, monkeypatch):
+        root = tmp_path / "hermes"
+        (root / "profiles").mkdir(parents=True)
+        monkeypatch.setattr(hermes_constants, "get_hermes_home", lambda: root)
+        monkeypatch.setattr(hermes_constants, "get_default_hermes_root", lambda: root)
+        monkeypatch.setattr(hermes_constants, "sudo_invoker_default_home", lambda: None)
+        monkeypatch.setenv("HERMES_HOME", str(root))
+        return root
+
+    @staticmethod
+    def _seed(home: Path) -> Path:
+        home.mkdir(parents=True, exist_ok=True)
+        (home / "config.yaml").write_text("{}\n", encoding="utf-8")
+        return home
+
+    def test_valid_named_profile_is_live(self, hermes_root):
+        home = self._seed(hermes_root / "profiles" / "alpha")
+
+        assert hermes_constants.named_profile_is_live(home)
+        assert hermes_constants.named_profile_has_identity(home)
+        assert hermes_constants.named_profile_has_servable_identity(home)
+        assert hermes_constants.assert_named_profile_home_live(home) == home
+
+    def test_absolute_path_escape_is_refused(self, hermes_root, tmp_path):
+        outside = self._seed(tmp_path / "rogue")
+
+        assert not hermes_constants.named_profile_is_live(outside)
+        assert not hermes_constants.named_profile_has_identity(outside)
+        assert not hermes_constants.named_profile_is_deleted(outside)
+        assert not hermes_constants.named_profile_delete_incomplete(outside)
+
+    def test_dotdot_traversal_is_refused(self, hermes_root, tmp_path):
+        outside = self._seed(tmp_path / "rogue")
+        traversed = hermes_root / "profiles" / ".." / ".." / "rogue"
+        assert outside.is_dir()  # the escape target is real; the path is refused before reaching it
+
+        assert not hermes_constants.named_profile_is_live(traversed)
+        assert not hermes_constants.named_profile_has_identity(traversed)
+        assert not hermes_constants.named_profile_is_deleted(traversed)
+
+    @pytest.mark.platforms("posix")
+    def test_symlink_escape_is_refused(self, hermes_root, tmp_path):
+        outside = self._seed(tmp_path / "rogue")
+        link = hermes_root / "profiles" / "linked"
+        link.symlink_to(outside, target_is_directory=True)
+
+        assert not hermes_constants.named_profile_is_live(link)
+        assert not hermes_constants.named_profile_has_identity(link)
+        assert not hermes_constants.named_profile_is_deleted(link)
+
+    def test_refusal_log_has_no_path(self, hermes_root, tmp_path, caplog):
+        outside = self._seed(tmp_path / "rogue-token-SECRETVALUE")
+        with caplog.at_level(logging.WARNING, logger="hermes_constants"):
+            assert not hermes_constants.named_profile_is_live(outside)
+        assert "Refused profile path" in caplog.text
+        assert "SECRETVALUE" not in caplog.text
