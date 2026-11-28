@@ -209,10 +209,46 @@ jobs:
           import { expect, test } from './test'
 
           const OUT = process.env.PAPER_SHOTS_DIR || '/tmp/paper-shots'
+          const FENCE = String.fromCharCode(96).repeat(3)
           const SIZES = [
             { label: 'desktop-1220x800', width: 1220, height: 800 },
             { label: 'narrow-480x800', width: 480, height: 800 }
           ]
+
+          // Synthetic fixture text only. No private or user content.
+          const MD_REPLY = [
+            '## Paper markdown fixture',
+            '',
+            'A paragraph with **bold**, *italic*, `inline code` and a [link](https://example.com).',
+            '',
+            '- first bullet',
+            '- second bullet with more words to wrap across the line when the window is narrow',
+            '',
+            '> A blockquote line used to check the quote styling.',
+            '',
+            '| Name | Value | Note |',
+            '| --- | --- | --- |',
+            '| alpha | 1 | first row |',
+            '| beta | 22 | second row |',
+            '',
+            FENCE + 'ts',
+            'export function add(a: number, b: number): number {',
+            '  return a + b // a code block to check mono font and surface',
+            '}',
+            FENCE,
+            '',
+            'END-OF-MD-FIXTURE'
+          ].join('\n')
+
+          const longReply = (n: number): string =>
+            Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of long reply ${n}: synthetic text to fill the transcript and exercise scrolling.`).join('\n\n') +
+            `\n\nEND-OF-LONG-${n}`
+
+          const replyForPrompt = (prompt: string): string => {
+            if (prompt.includes('PAPER_MD')) return MD_REPLY
+            const m = /PAPER_LONG_(\d)/.exec(prompt)
+            return m ? longReply(Number(m[1])) : 'Hello from the mock inference server! The full boot chain is working.'
+          }
 
           for (const mode of ['light', 'dark'] as const) {
             test.describe(`Paper ${mode}`, () => {
@@ -220,7 +256,7 @@ jobs:
 
               test.beforeAll(async () => {
                 fs.mkdirSync(OUT, { recursive: true })
-                fx = await setupMockBackend()
+                fx = await setupMockBackend({ mockServer: { replyForPrompt } })
                 await waitForAppReady(fx!, 120_000)
                 // Seed Paper before the app code of the next load runs, then reload so boot reads it.
                 await fx!.page.context().addInitScript(([m]) => {
@@ -241,7 +277,37 @@ jobs:
               })
 
               test(`paper ${mode} is active and screenshots`, async () => {
+                test.setTimeout(240_000)
                 const page = fx!.page
+
+                const shotBoth = async (scene: string): Promise<void> => {
+                  for (const size of SIZES) {
+                    await fx!.app.evaluate(({ BrowserWindow }, { width, height }) => {
+                      const win = BrowserWindow.getAllWindows()[0]
+                      win.unmaximize()
+                      win.setMinimumSize(300, 300)
+                      win.setBounds({ x: 0, y: 0, width, height })
+                    }, size)
+                    await page.waitForTimeout(800)
+                    const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
+                    console.log('PAPER-VIEWPORT ' + mode + ' ' + scene + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
+                    await page.screenshot({ path: `${OUT}/paper-${mode}-${scene}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                  }
+                }
+
+                const send = async (text: string, done: string): Promise<void> => {
+                  await fx!.app.evaluate(({ BrowserWindow }) => {
+                    BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                  })
+                  await page.waitForTimeout(500)
+                  const composer = page.locator('[contenteditable="true"]').first()
+                  await composer.click()
+                  await composer.type(text)
+                  await page.keyboard.press('Enter')
+                  await page.getByText(done).first().waitFor({ state: 'visible', timeout: 60_000 })
+                  await page.waitForTimeout(800)
+                }
+
                 const state = await page.evaluate(() => ({
                   theme: document.documentElement.dataset.hermesTheme,
                   mode: document.documentElement.dataset.hermesMode,
@@ -256,18 +322,29 @@ jobs:
                   phase: 'installed',
                   outDir: test.info().outputPath('paper-chat')
                 })
+                await shotBoth('chat')
 
-                for (const size of SIZES) {
-                  await fx!.app.evaluate(({ BrowserWindow }, { width, height }) => {
-                    const win = BrowserWindow.getAllWindows()[0]
-                    win.unmaximize()
-                    win.setMinimumSize(300, 300)
-                    win.setBounds({ x: 0, y: 0, width, height })
-                  }, size)
-                  await page.waitForTimeout(800)
-                  const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
-                  console.log('PAPER-VIEWPORT ' + mode + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
-                  await page.screenshot({ path: `${OUT}/paper-${mode}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                await send('PAPER_MD please show the markdown fixture', 'END-OF-MD-FIXTURE')
+                await shotBoth('markdown')
+
+                for (const n of [1, 2, 3]) {
+                  await send(`PAPER_LONG_${n} next long reply`, `END-OF-LONG-${n}`)
+                }
+                await shotBoth('long-chat')
+
+                // Settings: real app UI, opened through its own button.
+                await fx!.app.evaluate(({ BrowserWindow }) => {
+                  BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                })
+                await page.waitForTimeout(500)
+                const gear = page.getByLabel('Open settings').first()
+                if (await gear.count()) {
+                  await gear.click()
+                  await page.waitForTimeout(1500)
+                  console.log('PAPER-SCENE ' + mode + ' settings opened')
+                  await shotBoth('settings')
+                } else {
+                  console.log('PAPER-SCENE ' + mode + ' settings button not found')
                 }
               })
             })
