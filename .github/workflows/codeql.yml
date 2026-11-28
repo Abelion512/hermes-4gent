@@ -19,6 +19,12 @@ on:
   schedule:
     - cron: '16 0 * * 3'
 
+# Cancel only a superseded run of the same pull request. Push-to-main and scheduled runs
+# get a unique group per run, so they are never cancelled or replaced by another run.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('codeql-pr-{0}', github.event.pull_request.number) || format('codeql-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
