@@ -1,6 +1,6 @@
 name: Desktop verify (standard runners)
 
-# Draft. No cache saves, no artifacts, no secrets. Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
+# Draft. No cache saves, no secrets; the only artifact is the Paper screenshot PNGs (synthetic mock UI). Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
 # Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
 on:
   pull_request:
@@ -160,14 +160,14 @@ jobs:
           JS
           node /tmp/summ.cjs
 
-  e2e-base:
-    name: COMPARISON ONLY, true-base full E2E, not a verdict input
+  paper-visual:
+    name: Paper theme screenshots (synthetic fixture only, not a verdict input)
+    needs: static
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 47778138a87770dfa336c9c83b77d40e1e3c6d03
           persist-credentials: false
       - name: Electron system libraries
         run: |
@@ -196,53 +196,109 @@ jobs:
           if [ -e .venv ]; then echo ".venv already exists, leaving it"; else ln -s "$VIRTUAL_ENV" .venv; fi
           test -x .venv/bin/python
       - name: Record the exact source tested
-        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) (true base)"
-      - name: Build, then Playwright E2E
+        run: echo "PROBE-SRC HEAD=$(git rev-parse HEAD) pr-head=${{ github.event.pull_request.head.sha }}"
+      - name: Write the screenshot spec (generated at run time, not committed)
+        working-directory: apps/desktop
+        run: |
+          cat > e2e/zz-paper-visual.spec.ts <<'TS'
+          import fs from 'node:fs'
+
+          import { runDesktopChatSmoke } from '../../../tests-js/scripts/desktop-chat-smoke'
+
+          import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+          import { expect, test } from './test'
+
+          const OUT = process.env.PAPER_SHOTS_DIR || '/tmp/paper-shots'
+          const SIZES = [
+            { label: 'desktop-1220x800', width: 1220, height: 800 },
+            { label: 'narrow-480x800', width: 480, height: 800 }
+          ]
+
+          for (const mode of ['light', 'dark'] as const) {
+            test.describe(`Paper ${mode}`, () => {
+              let fx: MockBackendFixture | null = null
+
+              test.beforeAll(async () => {
+                fs.mkdirSync(OUT, { recursive: true })
+                fx = await setupMockBackend()
+                await waitForAppReady(fx!, 120_000)
+                // Seed Paper before the app code of the next load runs, then reload so boot reads it.
+                await fx!.page.context().addInitScript(([m]) => {
+                  localStorage.setItem('hermes-desktop-theme-v2', 'paper')
+                  localStorage.setItem('hermes-desktop-mode-v1', m)
+                }, [mode])
+                await fx!.page.evaluate(([m]) => {
+                  localStorage.setItem('hermes-desktop-theme-v2', 'paper')
+                  localStorage.setItem('hermes-desktop-mode-v1', m)
+                }, [mode])
+                await fx!.page.reload()
+                await waitForAppReady(fx!, 120_000)
+              })
+
+              test.afterAll(async () => {
+                await fx?.cleanup()
+                fx = null
+              })
+
+              test(`paper ${mode} is active and screenshots`, async () => {
+                const page = fx!.page
+                const state = await page.evaluate(() => ({
+                  theme: document.documentElement.dataset.hermesTheme,
+                  mode: document.documentElement.dataset.hermesMode,
+                  bodyBg: getComputedStyle(document.body).backgroundColor
+                }))
+                console.log('PAPER-STATE ' + mode + ' ' + JSON.stringify(state))
+                expect(state.theme).toBe('paper')
+                expect(state.mode).toBe(mode)
+
+                await runDesktopChatSmoke(page, {
+                  mockUrl: fx!.mockUrl,
+                  phase: 'installed',
+                  outDir: test.info().outputPath('paper-chat')
+                })
+
+                for (const size of SIZES) {
+                  await fx!.app.evaluate(({ BrowserWindow }, { width, height }) => {
+                    const win = BrowserWindow.getAllWindows()[0]
+                    win.unmaximize()
+                    win.setMinimumSize(300, 300)
+                    win.setBounds({ x: 0, y: 0, width, height })
+                  }, size)
+                  await page.waitForTimeout(800)
+                  const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
+                  console.log('PAPER-VIEWPORT ' + mode + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
+                  await page.screenshot({ path: `${OUT}/paper-${mode}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                }
+              })
+            })
+          }
+          TS
+      - name: Build, then Paper screenshots
         working-directory: apps/desktop
         env:
           CI: 'true'
-          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/pw-results.json
-          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
-          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
-          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
+          PAPER_SHOTS_DIR: /tmp/paper-shots
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
           NOUS_API_KEY: ''
         run: |
-          set +e
           if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
             echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
           fi
           export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
-          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
           pnpm run build
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list,json
-          code=$?
-          echo "PROBE-RESULT base playwright exit code $code, comparison only, not a verdict"
-          exit 0
-      - name: Per-test result list (log and job summary only, no artifact)
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-paper-visual.spec.ts --reporter=list --retries=0
+      - name: List screenshots (PNG files only are uploaded)
         if: always()
-        run: |
-          cat > /tmp/summ.cjs <<'JS'
-          const fs = require('fs')
-          let r
-          try { r = JSON.parse(fs.readFileSync('/tmp/pw-results.json', 'utf8')) } catch (e) { console.log('RESULT-LIST no json: ' + e.message); process.exit(0) }
-          const rows = []
-          const walk = (suite, file) => {
-            for (const sp of suite.specs || []) for (const t of sp.tests || []) {
-              const last = (t.results || []).slice(-1)[0] || {}
-              rows.push((t.status || last.status || '?') + ' | ' + (sp.file || file) + ':' + sp.line + ' | ' + (sp.title || '').slice(0, 110))
-            }
-            for (const c of suite.suites || []) walk(c, suite.file || file)
-          }
-          for (const s of r.suites || []) walk(s, s.file)
-          rows.sort()
-          const out = rows.map((x) => 'RESULT-LIST ' + x).join('\n')
-          console.log(out)
-          console.log('RESULT-COUNTS ' + JSON.stringify(r.stats || {}))
-          if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '### Per-test E2E results\n```\n' + rows.join('\n') + '\n```\n' + JSON.stringify(r.stats || {}) + '\n')
-          JS
-          node /tmp/summ.cjs
+        run: ls -la /tmp/paper-shots || true
+      - name: Upload Paper screenshots (synthetic mock-backend UI only, no config, env or traces)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: paper-visual-screenshots
+          path: /tmp/paper-shots/*.png
+          if-no-files-found: warn
+          retention-days: 7
 
   verdict:
     name: Overall result (requires static, all unit shards and E2E)
