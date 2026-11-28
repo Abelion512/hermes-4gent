@@ -448,30 +448,30 @@ export const slateTheme: DesktopTheme = {
  * Tokens without a reference source are marked derived.
  */
 const PAPER_LIGHT_COLORS: DesktopThemeColors = {
-  background: '#CFC9BC', // dimmed warm gray-brown paper; no surface approaches white
+  background: '#C2BBAD', // dimmed warm gray-brown paper; no surface approaches white
   foreground: '#191816',
-  card: '#DAD5C9',
+  card: '#CCC5B8',
   cardForeground: '#191816',
-  muted: '#C4BEB1', // derived: one step darker than the paper tone
-  mutedForeground: '#46423B',
-  popover: '#DAD5C9',
+  muted: '#B8B1A3', // derived: one step darker than the paper tone
+  mutedForeground: '#3E3A34',
+  popover: '#CCC5B8',
   popoverForeground: '#191816',
-  primary: '#7F3D2B',
+  primary: '#6E3020',
   primaryForeground: '#FFFFFF', // derived: reference has no buttons
-  secondary: '#D8C6B8',
+  secondary: '#CEBBAC',
   secondaryForeground: '#514D46',
-  accent: '#D8C6B8',
-  accentForeground: '#7A3623',
-  border: '#B3AC9D',
-  input: '#B3AC9D',
-  ring: '#7F3D2B',
-  midground: '#7F3D2B',
-  destructive: '#7A3623', // derived: dark accent doubles as the danger hue
+  accent: '#CEBBAC',
+  accentForeground: '#6E3020',
+  border: '#A59E8F',
+  input: '#A59E8F',
+  ring: '#6E3020',
+  midground: '#6E3020',
+  destructive: '#6E3020', // derived: dark accent doubles as the danger hue
   destructiveForeground: '#FFFFFF',
-  sidebarBackground: '#C4BEB1', // derived: reference page has no sidebar
-  sidebarBorder: '#B3AC9D',
-  userBubble: '#D8C6B8', // derived: reference has no chat UI
-  userBubbleBorder: '#BFA897'
+  sidebarBackground: '#B8B1A3', // derived: reference page has no sidebar
+  sidebarBorder: '#A59E8F',
+  userBubble: '#CEBBAC', // derived: reference has no chat UI
+  userBubbleBorder: '#B39F8F'
 }
 
 /** Dark counterpart: same warm terracotta family on a dim rose-black canvas. */
@@ -525,11 +525,11 @@ export const paperTheme: DesktopTheme = {
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '}' +
     'html:not(.dark){' +
-    '--ui-bg-input:#DAD5C9;' +
-    '--ui-bg-elevated:#DAD5C9 !important;' +
-    '--ui-bg-editor:#DFDACF !important;' +
-    '--dt-card:#DAD5C9 !important;' +
-    '--dt-popover:color-mix(in srgb,#DAD5C9 96%,transparent) !important;' +
+    '--ui-bg-input:#CCC5B8;' +
+    '--ui-bg-elevated:#CCC5B8 !important;' +
+    '--ui-bg-editor:#D3CDC0 !important;' +
+    '--dt-card:#CCC5B8 !important;' +
+    '--dt-popover:color-mix(in srgb,#CCC5B8 96%,transparent) !important;' +
     '}' +
     'html.dark{' +
     '--ui-bg-input:#2A2223;' +
@@ -539,17 +539,21 @@ export const paperTheme: DesktopTheme = {
     '}' +
     // Element-scoped composer rules redeclare --composer-fill and beat :root.
     'html:not(.dark) [data-slot="composer-root"],html:not(.dark) [data-hud-shell] [data-slot="composer-root"],html:not(.dark) [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
-    '--composer-fill:color-mix(in srgb,#DAD5C9 92%,transparent) !important;' +
+    '--composer-fill:color-mix(in srgb,#CCC5B8 92%,transparent) !important;' +
     '}' +
     'html.dark [data-slot="composer-root"],html.dark [data-hud-shell] [data-slot="composer-root"],html.dark [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#322829 94%,transparent) !important;' +
     '}' +
     // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
-    'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#7A3623 !important;--theme-primary:#7A3623;}' +
+    'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#6E3020 !important;--theme-primary:#6E3020;}' +
     'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D9887A !important;--theme-primary:#D9887A;}' +
     // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
     'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EFE4E3 72%,transparent) !important;}' +
     'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 70%,transparent) !important;}' +
+    // Paper light code: darken comment, red and purple tokens for the dim code panel (Paper only).
+    'html:not(.dark) .aui-shiki span[style*="#57606a"]{color:#434A52 !important;}' +
+    'html:not(.dark) .aui-shiki span[style*="#cf222e"]{color:#8F0B20 !important;}' +
+    'html:not(.dark) .aui-shiki span[style*="#8250df"]{color:#5A32A3 !important;}' +
     'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 70%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 70%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 70%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;}'
 }
 
