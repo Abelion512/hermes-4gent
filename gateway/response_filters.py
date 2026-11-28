@@ -78,7 +78,8 @@ def _strip_bracket_padding(text: str) -> str:
     brackets: the space between a marker and the note after it (``[SILENT] nothing new``) and
     any bracketed word that is not a marker are untouched, so prose stays prose.
     """
-    return re.sub(r"\s+\]", "]", re.sub(r"\[\s+", "[", text))
+    # (?<!\s): start only at the head of a whitespace run, so a long run with no ] after it is scanned once.
+    return re.sub(r"(?<!\s)\s+\]", "]", re.sub(r"\[\s+", "[", text))
 
 
 def _canonical_silence_candidate(text: str) -> str:
