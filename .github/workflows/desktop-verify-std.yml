@@ -1,5 +1,10 @@
 name: Desktop verify (standard runners)
 
+# TEMPORARY DIAGNOSTIC COMMIT: the unit shards, the full E2E and the verdict job are removed in this commit only
+# to avoid repeating the failing full suite while the composer hit-test failure is diagnosed. The full file is
+# restored afterwards. The verdict is NOT passed by this run. The diag spec is written at run time into the CI
+# checkout only (never committed to the repo) and prints the page state next to the failing check.
+
 # Draft. No cache saves, no artifacts, no secrets. Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
 # Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
 on:
@@ -52,79 +57,8 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm run typecheck
 
-  unit:
-    name: Unit tests (ui project, shard ${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-pm
-        with:
-          toolchain: node
-          save-tools-cache: 'false'
-          save-node-cache: 'false'
-          save-python-cache: 'false'
-      - name: Install desktop workspace (no lifecycle scripts)
-        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
-      - name: Runner hardware and toolchain actually in use
-        run: |
-          echo "cpus: $(nproc)"; free -m | head -2
-          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
-      - name: Unit tests (shard ${{ matrix.shard }}/4 of the ui project)
-        working-directory: apps/desktop
-        run: pnpm exec vitest run --project ui --shard=${{ matrix.shard }}/4
-
-  e2e:
-    name: Build and Playwright E2E (Electron under xvfb)
-    needs: static
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Electron system libraries
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
-      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
-      # (same inputs as e2e-desktop.yml, with every cache save turned off).
-      - uses: ./.github/actions/setup-pm
-        with:
-          toolchain: all
-          extras: '["all"]'
-          test-environment: 'true'
-          save-tools-cache: 'false'
-          save-node-cache: 'false'
-          save-python-cache: 'false'
-      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
-        run: pnpm install --frozen-lockfile
-      - name: Runner hardware and toolchain actually in use
-        run: |
-          echo "cpus: $(nproc)"; free -m | head -2
-          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
-      - name: Prepare locked Electron runtime
-        run: node scripts/build/electron-runtime.mjs --source .
-      - name: Build, then Playwright E2E
-        working-directory: apps/desktop
-        env:
-          CI: 'true'
-          OPENROUTER_API_KEY: ''
-          OPENAI_API_KEY: ''
-          NOUS_API_KEY: ''
-        run: |
-          pnpm run build
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list
-
   e2e-diag:
-    name: DIAGNOSTIC ONLY, 2 specs, not a verdict input
-    needs: static
+    name: DIAGNOSTIC ONLY, composer hit-test dump, not a verdict input
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -153,7 +87,7 @@ jobs:
           echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
       - name: Prepare locked Electron runtime
         run: node scripts/build/electron-runtime.mjs --source .
-      - name: Build, then 2 representative specs (diagnostic only, error blocks print early)
+      - name: Build, then composer hit-test diagnostic on the live fixture (diagnostic only)
         working-directory: apps/desktop
         env:
           CI: 'true'
@@ -162,15 +96,41 @@ jobs:
           NOUS_API_KEY: ''
         run: |
           pnpm run build
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/chat.spec.ts e2e/connection-version-label.spec.ts --reporter=list --retries=0 --max-failures=2
+          cat > e2e/zz-diag.spec.ts <<'SPEC'
+          import { setupMockBackend } from './fixtures'
+          import { test } from './test'
 
-  verdict:
-    name: Overall result (requires static, all unit shards and E2E)
-    needs: [static, unit, e2e]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - run: |
-          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} e2e=${{ needs.e2e.result }}"
-          test "${{ needs.static.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.e2e.result }}" = success
+          test('DIAG composer hit test on the live fixture', async () => {
+            test.setTimeout(150000)
+            const f = await setupMockBackend()
+            try {
+              await f.page.waitForSelector('[data-slot="composer-root"]', { timeout: 90000 }).catch(() => undefined)
+              await f.page.waitForTimeout(20000)
+              const win = await f.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({ bounds: w.getBounds(), visible: w.isVisible(), focused: w.isFocused(), minimized: w.isMinimized() }))).catch((e) => String(e))
+              const dom = await f.page.evaluate(() => {
+                const rect = (el) => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] }
+                const desc = (el) => { const cs = getComputedStyle(el); return { tag: el.tagName, id: el.id || undefined, slot: el.getAttribute('data-slot') || undefined, cls: String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).slice(0, 90), rect: rect(el), pos: cs.position, z: cs.zIndex, pe: cs.pointerEvents, op: cs.opacity, vis: cs.visibility } }
+                const root = document.querySelector('[data-slot="composer-root"]')
+                const ed = root ? root.querySelector('[contenteditable="true"]') : null
+                const out = { viewport: [innerWidth, innerHeight, devicePixelRatio], visibility: document.visibilityState, hasFocus: document.hasFocus(), scroll: [document.scrollingElement.scrollTop, document.scrollingElement.scrollLeft], rootRect: root ? rect(root) : null, editorRect: ed ? rect(ed) : null, editorDesc: ed ? desc(ed) : null }
+                if (ed) {
+                  const r = ed.getBoundingClientRect()
+                  const x = r.left + r.width / 2
+                  const y = r.top + r.height / 2
+                  out.center = [Math.round(x), Math.round(y)]
+                  out.stack = document.elementsFromPoint(x, y).slice(0, 8).map(desc)
+                  const hit = document.elementFromPoint(x, y)
+                  out.hitIsInsideEditor = !!hit && ed.contains(hit)
+                }
+                out.bigFixed = [...document.querySelectorAll('body *')].filter((el) => { const cs = getComputedStyle(el); if (cs.position !== 'fixed' && cs.position !== 'absolute') return false; const r = el.getBoundingClientRect(); return r.width > innerWidth * 0.5 && r.height > innerHeight * 0.5 && cs.visibility !== 'hidden' && cs.display !== 'none' }).slice(0, 8).map(desc)
+                out.dialogs = [...document.querySelectorAll('[role=dialog],[data-slot*=overlay],[data-slot*=dialog],[data-tour]')].slice(0, 8).map(desc)
+                return out
+              })
+              console.log('DIAG-WINDOW ' + JSON.stringify(win))
+              console.log('DIAG-DOM ' + JSON.stringify(dom))
+            } finally {
+              await f.cleanup()
+            }
+          })
+          SPEC
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1
