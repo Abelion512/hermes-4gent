@@ -61,7 +61,7 @@ function keyedPromptStore<T extends KeyedPrompt>(): PromptStore<T> {
         if (current && !(requestId && idOf(current) !== requestId)) {
           const next = { ...all }
           delete next[key]
-        $all.set(}
+          $all.set(next)
         }
 
         return
