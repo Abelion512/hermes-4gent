@@ -74,11 +74,14 @@ def _attested(data: object) -> tuple[list[str], str]:
 _KNOWN_PLATFORMS = frozenset({"linux", "macos", "windows"})
 
 
-def _platforms(data: object) -> list[str]:
+def _platforms(data: object) -> tuple[list[str], str]:
     platforms = data.get("platforms") if isinstance(data, dict) else None
     if not isinstance(platforms, list):
-        return []
-    return [p for p in platforms if isinstance(p, str) and p in _KNOWN_PLATFORMS]
+        return [], ""
+    for platform in platforms:
+        if not isinstance(platform, str) or platform not in _KNOWN_PLATFORMS:
+            return [], f"platforms entry {platform!r} is not linux, macos or windows"
+    return platforms, ""
 
 
 def source_fields(data: object) -> dict[str, str]:
@@ -91,14 +94,15 @@ def source_fields(data: object) -> dict[str, str]:
         subdir_raw = ""  # `subdir:` with no value means the repo root
     subdir = subdir_raw if isinstance(subdir_raw, str) else ""
     attested, attested_bad = _attested(data)
-    bad = _rejection(data, repo, sha, subdir_raw, subdir) or attested_bad
+    platforms, platforms_bad = _platforms(data)
+    bad = _rejection(data, repo, sha, subdir_raw, subdir) or attested_bad or platforms_bad
     return {
         "REPO": repo,
         "SHA": str(sha),
         "SUBDIR": subdir,
         "ATTESTED": "\n".join(attested),
         "DEFAULT": "true" if mapping.get("default") is True else "",
-        "PLATFORMS": "\n".join(_platforms(data)),
+        "PLATFORMS": "\n".join(platforms),
         "BAD": bad,
     }
 

@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from gateway import local_desktop_ui, local_viewer_events, session_server_requests
+from gateway.config import Platform
 from gateway.session_context import clear_session_vars, set_session_vars
 from tools import desktop_ui
 from tools.process_registry import process_registry
@@ -170,3 +171,17 @@ def test_connection_updates_reach_the_owner_in_either_install_order(window, monk
     count = len(window.streamed)
     other.transition("linear", TargetState.skipped, Actor.user)
     assert len(window.streamed) == count and sidecar == [other.op_id]
+
+
+def test_move_workspace_creates_a_missing_local_adapter(tmp_path, monkeypatch):
+    """A restored local session has no adapter in the map yet; its move must still be committed."""
+    import os
+
+    session = SimpleNamespace(source=SimpleNamespace(platform=Platform.LOCAL, chat_id="chat"), pending_workspace=None)
+    authority = SimpleNamespace(sessions={"canon": session}, runner=SimpleNamespace(adapters={}))
+    monkeypatch.setattr(local_desktop_ui, "_workspace_routes", {"turn": (authority, "canon", "key", None)})
+    folder = tmp_path / "project"
+    folder.mkdir()
+
+    assert local_desktop_ui._move_workspace("turn", str(folder)) == "pending"
+    assert session.pending_workspace == os.path.abspath(str(folder))

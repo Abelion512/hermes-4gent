@@ -167,6 +167,9 @@ def test_non_hex_sha_fails(tmp_path):
     ("subdir", 5, False),
     ("repo", "https://github.com/x\n::error::f", False),  # echoed into CI logs
     ("sha", "38fe0fb53eff98d477f807432e965429e665ca33\n", False),  # $ admits a trailing \n
+    ("platforms", ["linux"], True),
+    ("platforms", ["linxu"], False),  # a typo must not silently become "all platforms"
+    ("platforms", [5], False),
 ])
 def test_source_fields_the_pinned_gate_joins_or_echoes(tmp_path, field, value, ok):
     """The admission CI joins subdir onto the pinned clone and echoes repo/sha into the

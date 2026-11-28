@@ -23,4 +23,4 @@ capabilities:
   provides_middleware: []
   requires_env: []
 screenshots:
-  - https://raw.githubusercontent.com/air3Network/air-agent-hermes/a53103df6929397b9abf9b01bc874df0a2b7357d/docs/screenshots/agentic-identity.png
+  - https://raw.githubusercontent.com/air3Network/air-agent-hermes/f84e1350c80f25ce04978d5116c2bfdb6ee14fc0/docs/screenshots/agentic-identity.png

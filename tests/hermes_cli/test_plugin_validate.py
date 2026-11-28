@@ -282,6 +282,18 @@ class TestExclusiveProviderProbe:
         assert report.ok, report.failures
         assert ("capability probe", True, "register() ran in isolation") in report.checks
 
+    def test_family_registrar_on_general_plugin_fails(self, tmp_path):
+        """A general plugin only ever gets PluginContext; a collector method is a runtime bug."""
+        d = _make_plugin(
+            tmp_path,
+            manifest=BASE_MANIFEST,
+            init_py="class Provider:\n    name = 'fixture'\n"
+                    "def register(ctx):\n    ctx.register_cron_scheduler(Provider())\n",
+        )
+        report = validate_plugin_dir(d)
+        assert not report.ok
+        assert any("register() raised:" in f for f in report.failures)
+
     def test_unknown_context_method_still_fails(self, tmp_path):
         d = _make_plugin(
             tmp_path,

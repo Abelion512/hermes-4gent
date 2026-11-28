@@ -217,8 +217,10 @@ class Tree:
     """The files of one commit, read from git objects only."""
 
     def __init__(self, root: Path, rev: str) -> None:
+        # --end-of-options: *rev* comes from CLI flags, so a leading dash must name a (then unknown)
+        # revision, never a git option; every revision spelling git accepts stays accepted.
         self.root, self.rev = root, rev
-        listed = [p for p in self._git("ls-tree", "-r", "--name-only", "-z", rev).split("\0") if p]
+        listed = [p for p in self._git("ls-tree", "-r", "--name-only", "-z", "--end-of-options", rev).split("\0") if p]
         self.files = frozenset(listed)
         self.dirs = frozenset("/".join(parts[:i]) for p in listed for parts in [p.split("/")[:-1]]
                               for i in range(1, len(parts) + 1))
@@ -230,7 +232,7 @@ class Tree:
                               stdin=subprocess.DEVNULL).stdout.decode("utf-8-sig", "replace")
 
     def read(self, path: str) -> str:
-        return self._git("show", f"{self.rev}:{path}")
+        return self._git("show", "--end-of-options", f"{self.rev}:{path}")
 
 
 def _module_file(tree: Tree, module: str) -> str | None:
@@ -375,8 +377,17 @@ def _runs_on_hermes(resolver: Resolver, branch: ImportBranch) -> bool:
         _runs_on_hermes(resolver, b) for choice in branch.choices for b in choice.branches))
 
 
-def _sites(branch: ImportBranch) -> list[ImportSite]:  # NOSONAR: tree is finite and acyclic JSON/AST data
-    return [*branch.sites, *(s for choice in branch.choices for b in choice.branches for s in _sites(b))]
+def _sites(branch: ImportBranch) -> list[ImportSite]:
+    """Every site under *branch*, in the same depth-first order a recursive walk would use, gathered
+    iteratively: an adversarially deep index tree must not be able to hit the recursion limit."""
+    sites: list[ImportSite] = []
+    stack = [branch]
+    while stack:
+        current = stack.pop()
+        sites.extend(current.sites)
+        for choice in reversed(current.choices):
+            stack.extend(reversed(choice.branches))
+    return sites
 
 
 def _lost_sites(choice: ImportChoice, before: Resolver, after: Resolver) -> list[ImportSite]:

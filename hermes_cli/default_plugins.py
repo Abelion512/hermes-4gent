@@ -616,7 +616,7 @@ def step_install_default_plugins() -> dict:
                 ):
                     return {"ok": True}
         return {"ok": True, "spawned": spawn_install(), "owed": True}
-    except (OSError, ValueError) as exc:  # unreadable profiles dir, failed spawn: still owed, retried next boot
+    except Exception as exc:  # health: allow BLE001 -- any malformed input is owed, retried next boot
         return {"ok": False, "error": str(exc), "owed": True}
 
 

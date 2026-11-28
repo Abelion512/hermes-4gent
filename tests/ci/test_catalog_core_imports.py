@@ -290,3 +290,24 @@ def test_only_a_globals_write_can_stand_in_for_a_removed_name(index, core, modul
 def test_an_import_already_broken_on_the_base_is_not_this_changes_break(index, core):
     _commit(core[0], {"tools/registry.py": "def other(): ...\n"})
     assert _check(core[0], index, {"tools/registry.py": "def other(): ...\ndef another(): ...\n"}) == []
+
+
+def test_a_dash_leading_revision_is_never_read_as_a_git_option(tmp_path):
+    repo = tmp_path / "core"
+    repo.mkdir()
+    _git(repo, "init")
+    _commit(repo, {"a.py": "x = 1\n"})
+    with pytest.raises(subprocess.CalledProcessError):
+        cci.Tree(repo, "--help")
+
+
+def test_sites_walks_the_tree_in_depth_first_order_without_recursion():
+    leaf = lambda name: cci.ImportSite(rel="plugin.py", line=1, module=name, name="")
+    branch = cci.ImportBranch(
+        sites=[leaf("a")],
+        choices=[cci.ImportChoice(branches=[
+            cci.ImportBranch(sites=[leaf("b")], choices=[cci.ImportChoice(branches=[
+                cci.ImportBranch(sites=[leaf("c")], choices=[])])]),
+            cci.ImportBranch(sites=[leaf("d")], choices=[]),
+        ])])
+    assert [site.module for site in cci._sites(branch)] == ["a", "b", "c", "d"]

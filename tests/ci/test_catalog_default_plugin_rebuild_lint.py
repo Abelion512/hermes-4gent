@@ -15,7 +15,7 @@ SCRIPT = ROOT / "scripts" / "ci" / "catalog_validate_pinned_entries.py"
 REPO_URL = "https://fixture.invalid/repo"
 
 sys.path.insert(0, str(ROOT / "scripts" / "ci"))
-from catalog_default_plugin_lint import check_default_plugin_venv_rebuild
+from catalog_default_plugin_lint import _pinned_python_version, check_default_plugin_venv_rebuild
 import catalog_validate_pinned_entries as pinned_gate
 
 
@@ -127,6 +127,14 @@ def test_ci_default_check_uses_real_pinned_python_version_from_lock_json(tmp_pat
     assert result.unsatisfied_requirements == [
         "fixturedep>=1; sys_platform == 'win32' and python_full_version >= '3.14.1'"
     ]
+
+
+def test_malformed_lock_json_uses_the_default_python(tmp_path, monkeypatch):
+    """A non-mapping ``packages`` table falls back instead of raising AttributeError."""
+    (tmp_path / "pm").mkdir()
+    (tmp_path / "pm" / "lock.json").write_text('{"packages": []}', encoding="utf-8")
+    monkeypatch.setattr("pm.paths.lockfile_path", lambda: tmp_path / "missing-lock.json")
+    assert _pinned_python_version(tmp_path) == ("3.14.0", "3.14")
 
 
 def test_gha_escape_helpers():

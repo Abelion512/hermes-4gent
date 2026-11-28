@@ -293,7 +293,7 @@ def _git_path_dirs() -> list[str]:
         if installed is None:
             return []
         raw = Git().env(installed.path, current_target()).get("PATH") or []
-    except (OSError, ValueError, KeyError, RuntimeError):
+    except Exception:  # health: allow BLE001 -- a PATH probe must never abort environment creation
         return []
     entries = [raw] if isinstance(raw, str) else raw
     return [native(entry) for entry in entries if entry]

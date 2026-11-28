@@ -320,7 +320,10 @@ class PromptCacheWarmer:
             return self._stop(decision.stop_reason, lifecycle=True)
         turn = getattr(agent, "_user_turn_count", None)
         with self._lock:
-            budget = self._budget if self._budget is not None and self._budget.turn == turn else _Budget(turn)
+            budget = self._budget
+            if budget is None or budget.turn != turn:
+                budget = self._budget = _Budget(turn)
+                self._spent = None
         run = _Run(
             api_kwargs=self._replay_kwargs(api_kwargs), client=client, model=getattr(agent, "model", ""),
             cached_tokens=cached_tokens, uncached_tokens=uncached_tokens, ttl_s=window[1], deadline_at=window[0],

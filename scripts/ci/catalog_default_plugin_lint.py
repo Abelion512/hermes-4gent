@@ -39,7 +39,9 @@ def _pinned_python_version(project_root: Path | None = None) -> tuple[str, str]:
             data = json.loads(lock_path.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError):
             continue
-        raw = data.get("packages", {}).get("python", {}).get("version") if isinstance(data, dict) else None
+        packages = data.get("packages", {}) if isinstance(data, Mapping) else {}
+        python = packages.get("python", {}) if isinstance(packages, Mapping) else {}
+        raw = python.get("version") if isinstance(python, Mapping) else None
         if not isinstance(raw, str) or not raw.strip():
             continue
         full = raw.partition("+")[0].strip()

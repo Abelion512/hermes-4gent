@@ -314,7 +314,7 @@ def _record_settled_only(
             return "done", (ENSURE_EXIT_OK, _ensure_payload("nothing-pending", [], [], [], t0))
     except TimeoutError:  # another installer holds the lock; its pass covers this one
         return "done", (ENSURE_EXIT_TIMEOUT, _ensure_payload("timeout", [], [], [], t0))
-    except OSError as exc:
+    except Exception as exc:  # health: allow BLE001 -- a failed settle pass is owed, never fatal
         emit(f"default plugins ensure failed: {exc}")
         return "done", (ENSURE_EXIT_OWED, _ensure_payload("owed", [], [], [str(exc)], t0))
 
@@ -388,7 +388,7 @@ def ensure_defaults(
     subset_home = target_homes[0] if homes is not None and len(target_homes) == 1 else None
     try:
         child = _dp._launch_ensure_child(run_id, subset_home)
-    except OSError as exc:
+    except Exception as exc:  # health: allow BLE001 -- a failed launch is owed, never fatal
         emit(f"default plugins ensure failed: could not start the installer: {exc}")
         owed = list(pending_before) if pending_before else [str(exc)]
         return ENSURE_EXIT_OWED, _ensure_payload("owed", list(pending_before or ()), [], owed, t0)

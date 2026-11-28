@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearClarifyRequest, setClarifyRequest } from './clarify'
 import {
   $activeSessionAwaitingInput,
+  approvalKindFields,
   $approvalRequest,
   $secretRequest,
   $sudoRequest,
@@ -276,6 +277,35 @@ describe('approval prompt store', () => {
 
     expect(isSessionGone('transient-runtime')).toBe(false)
     expect($approvalRequest.get()?.requestId).toBe('r2')
+  })
+})
+
+describe('approvalKindFields name text', () => {
+  it('marks the spaces at either end of a site name so two names never read the same', () => {
+    expect(approvalKindFields({ kind: 'network', host: '  example.com  ' })).toEqual({
+      kind: 'network',
+      target: { host: '\u2423\u2423example.com\u2423\u2423' }
+    })
+    expect(approvalKindFields({ kind: 'network', host: 'example.com', label: 'prod ' })).toEqual({
+      kind: 'network',
+      target: { host: 'example.com', label: 'prod\u2423' }
+    })
+  })
+
+  it('keeps a space run inside a name as spaces; only the edges are marked', () => {
+    expect(approvalKindFields({ kind: 'access', path: '/srv/my  files' })).toEqual({
+      kind: 'access',
+      target: { path: '/srv/my  files' }
+    })
+  })
+
+  it('treats a white-space-only name as no name, and stays linear on a long inner run', () => {
+    expect(approvalKindFields({ kind: 'network', host: '   ' })).toEqual({ kind: 'network' })
+    const padded = `cdn${' '.repeat(10000)}.example.com`
+    expect(approvalKindFields({ kind: 'network', host: padded })).toEqual({
+      kind: 'network',
+      target: { host: padded }
+    })
   })
 })
 
