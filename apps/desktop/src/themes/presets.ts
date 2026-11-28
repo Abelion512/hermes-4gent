@@ -481,6 +481,12 @@ const PAPER_GRAY_CSS =
     'html:not(.dark) .aui-shiki span[style*="#116329"]{color:#0E5724 !important;}' +
     // Paper dark code: lift the dim comment token (github-dark-dimmed #768390) for the dark code panel (Paper only).
     'html.dark .aui-shiki span[style*="#768390" i]{color:#9AA7B3 !important;}' +
+    // Paper dark boundaries: the default strokes are accent-tinted and about 1.3:1 against the page, so
+    // code panels, tables and inputs vanish. Neutral strokes at 2.7-4.3:1, a code panel that steps
+    // off the page, a bordered code card and a visible table header (Paper dark only; light is unchanged).
+    'html.dark{--ui-stroke-primary:#7A7A7A !important;--ui-stroke-secondary:#666666 !important;--ui-stroke-tertiary:#5A5A5A !important;--ui-bg-editor:#252525 !important;}' +
+    'html.dark [data-slot="code-card"]{border:1px solid var(--ui-stroke-secondary);}' +
+    'html.dark .aui-md-table th{background:rgba(255,255,255,0.07) !important;}' +
     'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 80%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;}'
 
 // Paper Warm: the earlier, warmer light palette. Same structure as Paper Gray with its
