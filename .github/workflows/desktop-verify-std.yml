@@ -557,6 +557,16 @@ jobs:
                   console.log('PAPER-FOCUS ' + theme + ' ' + mode + ' active=' + (await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + ' ' + (e.getAttribute('aria-label') || e.textContent || '').slice(0, 40) : 'none' })))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-keyboard-focus-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
                   // Theme selector: real navigation (nav items are buttons: Settings > Appearance > Theme), real selection, real persistence check. Failures fail this job; nothing is swallowed.
+                  // The model dialog is still open at 480px from the previous shots: close it, restore the desktop window, then open the real Settings page.
+                  await page.keyboard.press('Escape')
+                  await page.waitForTimeout(400)
+                  await page.keyboard.press('Escape')
+                  await fx!.app.evaluate(({ BrowserWindow }) => {
+                    BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                  })
+                  await page.waitForTimeout(800)
+                  await page.getByRole('button', { name: 'Open settings', exact: true }).click({ timeout: 15000 })
+                  await page.waitForTimeout(1200)
                   await page.getByRole('button', { name: 'Appearance', exact: true }).click({ timeout: 15000 })
                   await page.getByRole('button', { name: 'Theme', exact: true }).click({ timeout: 15000 })
                   await page.getByPlaceholder(/Search your themes/).fill('Paper')
