@@ -27,7 +27,7 @@ _ACRONYM_SPELLING = {"ids": "IDs", "oauth": "OAuth", "urls": "URLs"}
 
 def humanize_key(key: str) -> str:
     """``maps_api_key`` → "Maps API key", ``webhookURL`` → "Webhook URL"."""
-    spaced = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", key))
+    spaced = re.sub(r"(?<![A-Z])([A-Z]+)([A-Z][a-z])", r"\1 \2", re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", key))
     words = [w for w in re.split(r"[\s_.\-/]+", spaced) if w]
 
     def _word(index: int, word: str) -> str:
