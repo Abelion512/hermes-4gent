@@ -71,8 +71,21 @@ def _attested(data: object) -> tuple[list[str], str]:
     return paths, ""
 
 
+_KNOWN_PLATFORMS = frozenset({"linux", "macos", "windows"})
+
+
+def _platforms(data: object) -> tuple[list[str], str]:
+    platforms = data.get("platforms") if isinstance(data, dict) else None
+    if not isinstance(platforms, list):
+        return [], ""
+    for platform in platforms:
+        if not isinstance(platform, str) or platform not in _KNOWN_PLATFORMS:
+            return [], f"platforms entry {platform!r} is not linux, macos or windows"
+    return platforms, ""
+
+
 def source_fields(data: object) -> dict[str, str]:
-    """REPO, SHA, SUBDIR, ATTESTED and the BAD verdict for a parsed entry."""
+    """REPO, SHA, SUBDIR, ATTESTED, DEFAULT, PLATFORMS and the BAD verdict for a parsed entry."""
     mapping = data if isinstance(data, dict) else {}
     repo = str(mapping.get("repo", ""))
     sha = mapping.get("sha", "")
@@ -81,9 +94,17 @@ def source_fields(data: object) -> dict[str, str]:
         subdir_raw = ""  # `subdir:` with no value means the repo root
     subdir = subdir_raw if isinstance(subdir_raw, str) else ""
     attested, attested_bad = _attested(data)
-    bad = _rejection(data, repo, sha, subdir_raw, subdir) or attested_bad
-    return {"REPO": repo, "SHA": str(sha), "SUBDIR": subdir, "ATTESTED": "\n".join(attested),
-            "BAD": bad}
+    platforms, platforms_bad = _platforms(data)
+    bad = _rejection(data, repo, sha, subdir_raw, subdir) or attested_bad or platforms_bad
+    return {
+        "REPO": repo,
+        "SHA": str(sha),
+        "SUBDIR": subdir,
+        "ATTESTED": "\n".join(attested),
+        "DEFAULT": "true" if mapping.get("default") is True else "",
+        "PLATFORMS": "\n".join(platforms),
+        "BAD": bad,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

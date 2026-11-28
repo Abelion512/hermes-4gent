@@ -12,7 +12,10 @@ import tomllib
 import pytest
 
 from pm.environment import PythonEnvironment
-from pm.plugin_declarations import read_python_declaration, unsupported_requirements
+from pm.plugin_declarations import (
+    PythonDeclaration, _eval_marker, _read_site_packages_distributions, read_python_declaration,
+    unsatisfied_requirements, unsupported_requirements,
+)
 from pm.workspace import enabled_member_dirs, lock_and_sync
 from tests.pm import _fixtures
 
@@ -144,3 +147,31 @@ def test_non_table_project_key_uses_the_legacy_manifest_declaration(tmp_path):
 
     assert declaration.pyproject is None
     assert declaration.requirements == ("fixturedep>=1,<2",)
+
+
+def test_non_table_tool_key_is_a_malformed_tooling_table(tmp_path):
+    """A scalar ``tool`` table is malformed, not a crash: [project] still owns packaging."""
+    project = tmp_path / "pyproject.toml"
+    project.write_text('tool = "lint label"\n[project]\nname = "probe"\nversion = "1"\n', encoding="utf-8")
+
+    declaration = read_python_declaration(tmp_path)
+
+    assert declaration.pyproject == project
+    assert declaration.requirements == ()
+    assert declaration.pyproject_installs is False
+
+
+def test_unevaluable_marker_is_conservatively_unsatisfied():
+    """A malformed marker fails closed at both the helper and the requirement boundary."""
+    spec = 'fixturedep; os_name === "posix"'
+    assert _eval_marker('os_name === "posix"', {}) is False
+    declaration = PythonDeclaration((), None, (spec,), {})
+    assert unsatisfied_requirements(declaration) == (spec,)
+
+
+def test_corrupt_dist_info_metadata_is_unreadable(tmp_path):
+    """Malformed METADATA bytes fail the site read instead of crashing the build."""
+    dist = tmp_path / "corrupt-1.0.dist-info"
+    dist.mkdir()
+    (dist / "METADATA").write_bytes(b"Metadata-Version: 2.1\nName: \xff\n")
+    assert _read_site_packages_distributions(tmp_path) is None

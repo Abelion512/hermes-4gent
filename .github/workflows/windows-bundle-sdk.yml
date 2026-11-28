@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-latest-32-arm-core, windows-latest-32-arm-core]
+        runner: [blacksmith-4vcpu-windows-2025, windows-latest-32-arm-core]
     steps:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8  # v1
         with:
