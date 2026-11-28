@@ -97,6 +97,8 @@ describe('Paper themes', () => {
     expect(warm?.customCSS).not.toContain('#BDB9AF')
     expect(gray?.customCSS).toContain('#BDB9AF')
     expect(gray?.customCSS).not.toContain('#CCC5B8')
+    expect(gray?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
+    expect(warm?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
     expect(gray?.customCSS).toContain('#768390')
     expect(warm?.customCSS).toContain('#768390')
   })
