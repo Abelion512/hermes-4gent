@@ -552,7 +552,7 @@ export function useComposerSubmit({
     if (retry) {
       queueRetry(retry)
     } else {
-      queueCurrentDraft()
+      void queueCurrentDraft()
     }
 
     refocusAfterSend(editorHadFocus)

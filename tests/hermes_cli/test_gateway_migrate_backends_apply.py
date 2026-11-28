@@ -1852,3 +1852,16 @@ def test_the_by_hand_recipe_copies_only_what_the_env_file_lacks(home, capsys):
     (rest,) = _system_unit_steps(home, capsys)  # nothing left to name: the generic line must not undo the .env
     assert rest == (f"# copy every HERMES_DASHBOARD_* line from the old launcher's environment that {env} does "
                     f"not already set, if any, into {env} (chmod 600)")
+
+
+def test_restore_refuses_a_backup_outside_the_backup_dir(tmp_path):
+    """A manifest's backup path is untrusted file content: it must stay inside BACKUP_DIR."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "config.yaml").write_text("secret", encoding="utf-8")
+    manifest = {
+        "backups": {"config": str(outside / "config.yaml")},
+        "files_after_apply": {"config.yaml": "digest", ".env": "digest"},
+    }
+    problem = engine._restore_files_problem(tmp_path, manifest)
+    assert problem is not None and "outside" in problem

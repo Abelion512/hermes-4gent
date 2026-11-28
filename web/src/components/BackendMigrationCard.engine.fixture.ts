@@ -12,7 +12,7 @@ export const refusedUrlPlans = {
     "dry_run": true,
     "exit_code": 3,
     "plan": {
-      "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refused_url0/hermes-home",
+      "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refused_url0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
       "old_backend": null,
       "old_address": null,
       "new_address": null,
@@ -89,7 +89,7 @@ export const refusedUrlPlans = {
     "dry_run": true,
     "exit_code": 3,
     "plan": {
-      "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refused_url0/hermes-home",
+      "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refused_url0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
       "old_backend": null,
       "old_address": null,
       "new_address": null,
@@ -167,7 +167,7 @@ export const refusalBlockers = {
   "configBackend": "HERMES_CONFIG_BACKEND=remote keeps the settings outside config.yaml, but the migration backs up, rolls back and restores only config.yaml, so it needs the file config backend. Move this home by hand with the steps in the docs. Nothing changed.",
   "providers": "The old backend requires sign-in but its sign-in providers could not be read (127.0.0.1:9119/api/auth/providers did not answer), so the move could not check that the gateway offers the same ones. Check that the old backend answers there, then run this again. Nothing changed.",
   "managed": "The managed config /var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_managed0/managed/config.yaml sets webapp.port, which the gateway applies after this home's config.yaml: after the move its Webapp would serve 0.0.0.0:8000 instead of serving 0.0.0.0:9119, so the old backend would be stopped for nothing. Have the administrator change that setting, then run this again. Nothing changed.",
-  "guardPath": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refusals_guard_path_0/systemd-user/hermes-dashboard.service.d/hermes-migrated.conf already exists; move it aside before migrating this backend."
+  "guardPath": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_refusals_guard_path_0/systemd-user/hermes-dashboard.service.d/hermes-migrated.conf already exists; move it aside before migrating this backend."  // NOSONAR: captured fixture text, not filesystem access
 };
 
 export const relativeLauncherStatus = {
@@ -355,7 +355,7 @@ export const killedWhileWritingStatus = {
     "manual_steps": [
       "hermes -p default gateway stop",
       "the migration stopped while writing /var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing_conf0/hermes-home/config.yaml, so it may hold the migration's changes: compare it with /var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing_conf0/hermes-home/backend_migration/config.yaml.bak and put back by hand what the migration changed, before you start the old backend",
-      "/var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing_conf0/hermes-home/.env was restored from its backup (nothing to do for it)",
+      "/var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing_conf0/hermes-home/.env was restored from its backup (nothing to do for it)",  // NOSONAR: captured fixture text, not filesystem access
       "hermes -p default gateway uninstall",
       "systemctl --user enable hermes-dashboard.service",
       "systemctl --user start hermes-dashboard.service"
@@ -415,7 +415,7 @@ export const killedWhileWritingStatus = {
     "finished_at": 1795209914.2343907,
     "manual_steps": [
       "hermes -p default gateway stop",
-      "/var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing__env0/hermes-home/config.yaml was restored from its backup (nothing to do for it)",
+      "/var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing__env0/hermes-home/config.yaml was restored from its backup (nothing to do for it)",  // NOSONAR: captured fixture text, not filesystem access
       "the migration stopped while writing /var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing__env0/hermes-home/.env, so it may hold the migration's changes: compare it with /var/tmp/hermes-pytest-1000/r-6k0fwp96/pytest-of-mark/pytest-0/test_killed_while_writing__env0/hermes-home/backend_migration/env.bak and put back by hand what the migration changed, before you start the old backend",
       "hermes -p default gateway uninstall",
       "systemctl --user enable hermes-dashboard.service",
@@ -546,7 +546,7 @@ export const unknownStateStatus = {
   "state": "failed",
   "step": "",
   "steps": [],
-  "message": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_unknown_state0/hermes-home/backend_migration.json has an unrecognized migration state; nothing can be undone automatically",
+  "message": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_unknown_state0/hermes-home/backend_migration.json has an unrecognized migration state; nothing can be undone automatically",  // NOSONAR: captured fixture text, not filesystem access
   "old_address": "",
   "new_address": "",
   "started_at": 0.0,
@@ -768,7 +768,7 @@ export const exit5BundleStatus = {
 // The plan route's blockers for a Hermes home whose path holds the engine's remedy text: a symbolic-link
 // config.yaml, and an unreadable turn-marker file under that home.
 export const flagInPathBlockers = {
-  "symlink": "/var/tmp/hermes-pytest-1000/r-3n0nc6rb/pytest-of-mark/pytest-0/test_flag_text_inside_a_path0/--force-interrupt/, then re-run with --force-interrupt (any running turn is interrupted)./h/config.yaml is a symbolic link: the migration would change the file it points to, which may be shared. Replace the link with a copy of the file (or move this home off the shared file), then run this again.",
+  "symlink": "/var/tmp/hermes-pytest-1000/r-3n0nc6rb/pytest-of-mark/pytest-0/test_flag_text_inside_a_path0/--force-interrupt/, then re-run with --force-interrupt (any running turn is interrupted)./h/config.yaml is a symbolic link: the migration would change the file it points to, which may be shared. Replace the link with a copy of the file (or move this home off the shared file), then run this again.",  // NOSONAR: captured fixture text, not filesystem access
   "unknown": "Cannot tell whether turns are running on the old backend: these turn-marker files cannot be read, or hold a marker whose writer cannot be checked: /var/tmp/hermes-pytest-1000/r-3n0nc6rb/pytest-of-mark/pytest-0/test_flag_text_inside_a_path0/--force-interrupt/, then re-run with --force-interrupt (any running turn is interrupted)./h/desktop/interrupted_turns.json. To move it, confirm it is idle, then re-run with --force-interrupt (any running turn is interrupted)."
 };
 
@@ -829,8 +829,8 @@ export const engineStepStrings = [
   "$env:HERMES_HOME='\\var\\tmp\\hermes-pytest-1000\\r-7q_qoome\\pytest-of-mark\\pytest-0\\test_collect0\\w h'; hermes gateway status",
   "$env:HERMES_HOME='\\var\\tmp\\hermes-pytest-1000\\r-7q_qoome\\pytest-of-mark\\pytest-0\\test_collect0\\w h'; hermes webapp --build-only",
   "$env:HERMES_HOME='\\var\\tmp\\hermes-pytest-1000\\r-7q_qoome\\pytest-of-mark\\pytest-0\\test_collect0\\w h'; hermes webapp --status",
-  "/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/home/.env was restored from its backup (nothing to do for it)",
-  "/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/home/config.yaml was restored from its backup (nothing to do for it)",
+  "/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/home/.env was restored from its backup (nothing to do for it)",  // NOSONAR: captured fixture text, not filesystem access
+  "/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/home/config.yaml was restored from its backup (nothing to do for it)",  // NOSONAR: captured fixture text, not filesystem access
   "HERMES_HOME='/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/x h' hermes config set webapp.enabled true",
   "HERMES_HOME='/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/x h' hermes config set webapp.host 0.0.0.0",
   "HERMES_HOME='/var/tmp/hermes-pytest-1000/r-7q_qoome/pytest-of-mark/pytest-0/test_collect0/x h' hermes config set webapp.port 9119",
@@ -889,7 +889,7 @@ export const planWhileRunning = {
   "dry_run": true,
   "exit_code": 0,
   "plan": {
-    "home": "/var/tmp/hermes-pytest-1000/r-f3103xa2/pytest-of-mark/pytest-0/test_plan_while_a_run_is_runni0/hermes-home",
+    "home": "/var/tmp/hermes-pytest-1000/r-f3103xa2/pytest-of-mark/pytest-0/test_plan_while_a_run_is_runni0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
     "old_backend": {
       "supervisor": "systemd",
       "unit": "hermes-dashboard.service",

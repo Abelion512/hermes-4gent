@@ -44,7 +44,7 @@ def _runtime_trees_hidden_by(exclude: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _revision_has_path(repo: Path, ref: str, path: str) -> bool:
-    probe = subprocess.run(
+    probe = subprocess.run(  # NOSONAR: argv list, no shell; ref is a verified SHA and path is internal
         ["git", "cat-file", "-e", f"{ref}:{path}"],
         cwd=repo, check=False, timeout=60,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

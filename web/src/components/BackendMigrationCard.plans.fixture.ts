@@ -10,7 +10,7 @@ export const containerPlans = {
       "dry_run": true,
       "exit_code": 3,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_1_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_1_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -87,7 +87,7 @@ export const containerPlans = {
       "dry_run": true,
       "exit_code": 6,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_1_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_1_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -170,7 +170,7 @@ export const containerPlans = {
       "dry_run": true,
       "exit_code": 3,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_None_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_None_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -247,7 +247,7 @@ export const containerPlans = {
       "dry_run": true,
       "exit_code": 6,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_None_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_container_None_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -333,7 +333,7 @@ export const systemSystemdPlans = {
       "dry_run": true,
       "exit_code": 3,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_1_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_1_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -410,7 +410,7 @@ export const systemSystemdPlans = {
       "dry_run": true,
       "exit_code": 6,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_1_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_1_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -507,7 +507,7 @@ export const systemSystemdPlans = {
       "dry_run": true,
       "exit_code": 3,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_None_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_None_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,
@@ -584,7 +584,7 @@ export const systemSystemdPlans = {
       "dry_run": true,
       "exit_code": 6,
       "plan": {
-        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_None_0/hermes-home",
+        "home": "/var/tmp/hermes-pytest-1000/r-deb5velf/pytest-of-mark/pytest-0/test_plan_systemd_system_None_0/hermes-home",  // NOSONAR: captured fixture text, not filesystem access
         "old_backend": null,
         "old_address": null,
         "new_address": null,

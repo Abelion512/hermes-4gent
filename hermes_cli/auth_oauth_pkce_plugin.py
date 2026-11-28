@@ -180,7 +180,7 @@ def login(provider: str, cfg: OAuthPKCEConfig, *, open_browser: bool = True) -> 
     handler_cls, result = _make_loopback_callback_handler(path, display_name=cfg.label or provider)
     server = _bind_loopback_callback_server(
         "127.0.0.1", int(cfg.redirect_port), handler_cls, err=err, bind_failed_code="oauth_callback_bind_failed")
-    redirect_uri = f"http://{cfg.redirect_host}:{server.server_address[1]}{path}"
+    redirect_uri = f"http://{cfg.redirect_host}:{server.server_address[1]}{path}"  # NOSONAR: loopback redirect; listener binds 127.0.0.1 only
     verifier = _pkce_code_verifier()
     state = secrets.token_urlsafe(32)
     params = {

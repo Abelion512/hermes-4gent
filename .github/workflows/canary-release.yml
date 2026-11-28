@@ -31,10 +31,6 @@ on:
         type: boolean
         default: true
 
-permissions:
-  contents: write # tag push + release create/delete for prune
-  actions: write # release.py dispatches the Stable Release pipeline on the canary tag
-
 concurrency:
   group: canary-release
   cancel-in-progress: false
@@ -43,6 +39,9 @@ jobs:
   tag:
     name: Tag, draft, and start the canary build
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: write # tag push + release create
+      actions: write # release.py dispatches the Stable Release pipeline on the canary tag
     # A dispatch from a feature branch would tag unmerged code as the canary.
     if: github.ref_name == github.event.repository.default_branch
     steps:
@@ -68,6 +67,8 @@ jobs:
   prune:
     name: Prune canaries older than 14 days
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: write # release create/delete for prune
     needs: tag
     environment: release-signing
     # Prune even when this run had nothing new to tag. The release pipeline

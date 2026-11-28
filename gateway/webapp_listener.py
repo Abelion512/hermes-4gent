@@ -231,7 +231,7 @@ def bind_origin(bind_host: str, port: int) -> str | None:
     """``http://<address>:<port>`` a browser opens for a specific-address bind, else None."""
     if not _specific_address(bind_host):
         return None
-    return f"http://[{bind_host}]:{port}" if ":" in bind_host else f"http://{bind_host}:{port}"
+    return f"http://[{bind_host}]:{port}" if ":" in bind_host else f"http://{bind_host}:{port}"  # NOSONAR: this machine's HTTP listener; sign-in gates every request
 
 
 def dial_host(bind_host: str) -> str:

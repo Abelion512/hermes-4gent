@@ -240,7 +240,7 @@ def pin_hermes_home(root, command: str, *, powershell: bool = False) -> str:
     if not flavour.isabs(root):
         root = flavour.normpath(flavour.join(os.getcwd(), root))
     if not powershell:
-        return f"HERMES_HOME={shlex.quote(root)} {command}"
+        return f"HERMES_HOME={shlex.quote(root)} {command}"  # NOSONAR: shell-quoted value in a printed command, never executed
     for mark in _PS_SINGLE_QUOTES:
         root = root.replace(mark, mark * 2)
     return f"$env:HERMES_HOME='{root}'; {command}"
@@ -275,7 +275,7 @@ def _profile_root(home: str, name: Optional[str]) -> Optional[str]:
     from pathlib import Path
     if name == "default":
         return home
-    for candidate in (Path(home), Path(home).resolve(strict=False)):
+    for candidate in (Path(home), Path(home).resolve(strict=False)):  # NOSONAR: local path shape check; result is display-only
         if candidate.name == name and candidate.parent.name == "profiles":
             return str(candidate.parent.parent)
     return None
@@ -288,7 +288,7 @@ def _is_standard_root(root) -> bool:
     from hermes_constants import _get_platform_default_hermes_home
 
     def resolved(path) -> str:
-        return os.path.normcase(str(Path(path).resolve(strict=False)))
+        return os.path.normcase(str(Path(path).resolve(strict=False)))  # NOSONAR: local identity comparison; no observable oracle
     return resolved(root) == resolved(_get_platform_default_hermes_home())
 
 

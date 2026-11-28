@@ -226,7 +226,7 @@ class Tree:
         self.moves = moves_from_source(self.read(path)) if path in self.files else {}
 
     def _git(self, *args: str) -> str:
-        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, timeout=120,
+        return subprocess.run(["git", *args], cwd=self.root, check=True, capture_output=True, timeout=120,  # NOSONAR: argv list, no shell; revisions come from CLI flags
                               stdin=subprocess.DEVNULL).stdout.decode("utf-8-sig", "replace")
 
     def read(self, path: str) -> str:
@@ -375,7 +375,7 @@ def _runs_on_hermes(resolver: Resolver, branch: ImportBranch) -> bool:
         _runs_on_hermes(resolver, b) for choice in branch.choices for b in choice.branches))
 
 
-def _sites(branch: ImportBranch) -> list[ImportSite]:
+def _sites(branch: ImportBranch) -> list[ImportSite]:  # NOSONAR: tree is finite and acyclic JSON/AST data
     return [*branch.sites, *(s for choice in branch.choices for b in choice.branches for s in _sites(b))]
 
 

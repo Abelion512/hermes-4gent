@@ -123,7 +123,7 @@ def registered_lan_origin(home: Path, port: int) -> Optional[str]:
     callback = _registered_callback(_registration(home))
     if callback is None or callback[1] != port or callback[0] != lan_address():
         return None
-    return f"http://{callback[0]}:{port}"
+    return f"http://{callback[0]}:{port}"  # NOSONAR: this machine's LAN Webapp; HTTP by design
 
 
 def sign_in_address(home: Path, bound_host: str, port: int, public_url: str) -> tuple[Optional[str], Optional[str]]:
@@ -152,7 +152,7 @@ def sign_in_address(home: Path, bound_host: str, port: int, public_url: str) -> 
     if (registered_host, registered_port) == (bound_host, port):
         return own, None
     registered = (bind_origin(registered_host or "", registered_port)
-                  or f"http://{registered_host}:{registered_port}")
+                  or f"http://{registered_host}:{registered_port}")  # NOSONAR: local Webapp address shown in a note; HTTPS case already returned above
     changed = " and ".join(key for key, same in (("webapp.host", registered_host == bound_host),
                                                   ("webapp.port", registered_port == port)) if not same)
     return own, (f"Nous sign-in that Settings → Web Access registered returns to {registered}, but the Webapp "

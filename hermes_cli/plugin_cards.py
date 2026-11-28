@@ -88,7 +88,7 @@ async def apost(ctx: Any, card: Any, *, session_key=None, origin=None) -> dict[s
         return _err("gateway_unavailable", "the gateway loop closed before the card was scheduled")
     try:
         return await task
-    except asyncio.CancelledError:
+    except asyncio.CancelledError:  # NOSONAR: caller cancellation is re-raised below; gateway cancellation is reported
         current = asyncio.current_task()
         if current is not None and current.cancelling():  # the caller's own cancellation, not the gateway's
             raise
