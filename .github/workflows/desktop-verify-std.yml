@@ -549,6 +549,7 @@ jobs:
                   await modelBox.click()
                   await expect(page.getByRole('listbox')).toBeVisible({ timeout: 15000 })
                   await page.waitForTimeout(500)
+                  console.log('PAPER-VIEWPORT ' + mode + ' dropdown-open actual ' + JSON.stringify(await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-dropdown-open-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
                   await page.keyboard.press('Escape')
                   await page.waitForTimeout(400)
@@ -584,9 +585,19 @@ jobs:
                   expect(after.attr).toBe(other)
                   expect(after.stored).toBe(other)
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-after-pick-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Diagnostic: computed border and fill of the Settings controls on this page (values only, not a verdict).
+                  console.log('PAPER-INPUTS ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
+                    const pick = (el: Element) => { const cs = getComputedStyle(el); return { tag: el.tagName, role: el.getAttribute('role'), label: (el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 30), border: cs.borderTopColor, borderW: cs.borderTopWidth, bg: cs.backgroundColor } }
+                    return Array.from(document.querySelectorAll('input, select, [role="combobox"], textarea')).filter((el) => (el as HTMLElement).offsetParent !== null).slice(0, 8).map(pick)
+                  })))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-inputs-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
                   // Persistence across a real reload (boot reads the stored pick; the seed no longer overwrites it).
+                  // Settings is an overlay that a reload restores from the hash route, and it covers the composer, so
+                  // waitForAppReady (composer hit-test) cannot pass here. Poll the persisted theme state instead.
+                  // Coverage gap: chat readiness after this reload is not asserted.
                   await page.reload()
-                  await waitForAppReady(fx!, 120_000)
+                  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.hermesTheme), { timeout: 90_000 }).toBe(other)
+                  await page.waitForTimeout(1500)
                   const reloaded = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, mode: document.documentElement.dataset.hermesMode, stored: localStorage.getItem('hermes-desktop-theme-v2') }))
                   console.log('PAPER-RELOAD ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(reloaded))
                   expect(reloaded.attr).toBe(other)
