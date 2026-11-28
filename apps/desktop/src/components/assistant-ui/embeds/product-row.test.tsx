@@ -37,6 +37,9 @@ describe('ProductRow', () => {
     expect(cards(container)).toHaveLength(3)
     expect(screen.getByText('Laptop A')).toBeTruthy()
     expect(screen.getByText('Rp 15.000.000')).toBeTruthy()
+    // The card price never wraps: long producer prices stay one line, the
+    // full string lives in the detail popup.
+    expect(screen.getByText('Rp 15.000.000').className).toContain('truncate')
     expect(screen.getByText('16 GB RAM · OLED')).toBeTruthy()
     expect(screen.queryByText('Long battery')).toBeNull()
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -61,6 +64,13 @@ describe('ProductRow', () => {
     expect(within(dialog).getByText('Long battery')).toBeTruthy()
     expect(within(dialog).getByText('Bright screen')).toBeTruthy()
     expect(within(dialog).getByText('Soldered RAM')).toBeTruthy()
+
+    // Long detail scrolls INSIDE the body (the shell is height-capped);
+    // scroll-fade-y fades clipped edges so it reads as scrollable at rest.
+    const body = dialog.querySelector('.scroll-fade-y')!
+
+    expect(body).toBeTruthy()
+    expect(body.className).toContain('overflow-y-auto')
 
     const link = within(dialog).getByText('shop.example').closest('a')!
 
