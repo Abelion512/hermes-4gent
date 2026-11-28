@@ -468,7 +468,7 @@ const PAPER_GRAY_CSS =
     '}' +
     // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
     'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#5A2416 !important;--theme-primary:#5A2416;}' +
-    'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D9887A !important;--theme-primary:#D9887A;}' +
+    'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#7DB9FF !important;--theme-primary:#4DA3FF;}' +
     // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
     'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#F0F0F0 72%,transparent) !important;}' +
     'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 80%,transparent) !important;}' +
@@ -564,16 +564,16 @@ const PAPER_DARK_COLORS: DesktopThemeColors = {
   mutedForeground: '#B4B4B4',
   popover: '#202020',
   popoverForeground: '#F0F0F0',
-  primary: '#D9887A',
-  primaryForeground: '#241611',
+  primary: '#4DA3FF',
+  primaryForeground: '#06121F',
   secondary: '#2E2E2E',
   secondaryForeground: '#E6E6E6',
   accent: '#2E2E2E',
-  accentForeground: '#EBA39A',
+  accentForeground: '#7DB9FF',
   border: '#404040',
   input: '#404040',
-  ring: '#D9887A',
-  midground: '#D9887A',
+  ring: '#4DA3FF',
+  midground: '#4DA3FF',
   destructive: '#D0705F',
   destructiveForeground: '#241611',
   sidebarBackground: '#1B1B1B',
