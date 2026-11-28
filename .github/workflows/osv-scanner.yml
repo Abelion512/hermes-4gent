@@ -1,10 +1,10 @@
 name: OSV-Scanner
 
 # Scans lockfiles (uv.lock, pnpm-lock.yaml, package-lock.json) against the OSV vulnerability
-# database. Runs on a weekly schedule against main (and on manual dispatch);
-# it is deliberately NOT part of per-PR CI — the findings are the repo-wide
-# baseline of pinned-dep CVEs, identical for every PR, and belong in the
-# Security tab, not in each PR's review comment.
+# database. Runs on pull requests to main (so the code-scanning merge rule that
+# requires osv-scanner results has an analysis for every PR head), on a weekly
+# schedule against main, and on manual dispatch. The scan always covers the
+# full lockfile set, not just the PR diff, and never fails the job on findings.
 #
 # This is detection-only — OSV-Scanner does NOT open PRs or modify pins.
 # It reports known CVEs in currently-pinned dependency versions so we can
@@ -22,6 +22,10 @@ name: OSV-Scanner
 # vulnerabilities in pinned deps that we may need to patch deliberately.
 
 on:
+  pull_request:
+    # No paths filter: the ruleset requires an osv-scanner analysis on every
+    # PR to main, including PRs that change no lockfile.
+    branches: [main]
   schedule:
     # Weekly scan against main — catches CVEs published after merge for
     # deps that haven't changed since.
@@ -37,7 +41,7 @@ permissions:
 jobs:
   scan:
     name: Scan lockfiles
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@32d3cd482bdadfb38b186c0ad1b031902d55d932 # v2.7.1
     with:
       # Scan explicit lockfiles rather than recursing, so we only look at
       # the five sources of truth and skip vendored / test / worktree dirs.
