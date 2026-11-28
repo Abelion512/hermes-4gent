@@ -154,7 +154,8 @@ const nameText = (value: unknown): string | undefined =>
     ? value
         .replace(HIDDEN_CHARS, escapeHiddenChar)
         .replace(LOOKALIKE_SPACES, escapeHiddenChar)
-        .replace(/^ +| +$/g, spaces => '\u2423'.repeat(spaces.length))
+        .replace(/^ +/, spaces => '\u2423'.repeat(spaces.length))
+        .replace(/ +$/, spaces => '\u2423'.repeat(spaces.length))
     : undefined
 
 /** `name` for a place that may draw a run of spaces as one blank (a system notification, a
@@ -701,4 +702,4 @@ export function clearAllPrompts(sessionId?: string | null, mode: ClearPromptsMod
   vaultUnlock.clear(sessionId)
   vaultSave.clear(sessionId)
   vaultCode.clear(sessionId)
-}
+     }
