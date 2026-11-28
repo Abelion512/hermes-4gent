@@ -61,3 +61,51 @@ describe('theme typography Latin Extended fallback (#61392)', () => {
     expect(DEFAULT_TYPOGRAPHY.fontMono).toContain('Noto Sans Mono')
   })
 })
+
+describe('Paper themes', () => {
+  const gray = BUILTIN_THEME_LIST.find(t => t.name === 'paper')
+  const warm = BUILTIN_THEME_LIST.find(t => t.name === 'paper-warm')
+
+  it('registers both selectable variants under distinct keys; paper key keeps working', () => {
+    expect(gray?.label).toBe('Paper Gray')
+    expect(warm?.label).toBe('Paper Warm')
+    expect(new Set(BUILTIN_THEME_LIST.map(t => t.name)).size).toBe(BUILTIN_THEME_LIST.length)
+  })
+
+  it('light palettes differ, dark palette is shared', () => {
+    expect(gray?.colors.background).toBe('#B4B0A6')
+    expect(warm?.colors.background).toBe('#C2BBAD')
+    expect(warm?.colors.sidebarBackground).toBe('#B8B1A3')
+    expect(gray?.colors.sidebarBackground).toBe('#B8B1A3')
+    expect(warm?.darkColors).toEqual(gray?.darkColors)
+  })
+
+  it('has no near-white light surfaces', () => {
+    for (const t of [gray, warm]) {
+      for (const k of ['background', 'card', 'popover', 'secondary', 'sidebarBackground', 'muted'] as const) {
+        const value = t!.colors[k]
+        expect(value, `${t!.name}.${k} defined`).toBeTruthy()
+        const hex = (value ?? '').replace('#', '')
+        const lum = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).reduce((a, b) => a + b, 0) / 3
+        expect(lum, `${t!.name}.${k}`).toBeLessThan(0.8)
+      }
+    }
+  })
+
+  it('swaps accent and surfaces in custom CSS without leaking the other palette', () => {
+    expect(warm?.customCSS).toContain('#CCC5B8')
+    expect(warm?.customCSS).not.toContain('#BDB9AF')
+    expect(gray?.customCSS).toContain('#BDB9AF')
+    expect(gray?.customCSS).not.toContain('#CCC5B8')
+    expect(gray?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
+    expect(warm?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
+    for (const css of [gray?.customCSS, warm?.customCSS]) {
+      for (const rose of ['#2A2223', '#272021', '#322829', '#EFE4E3']) {
+        expect(css).not.toContain(rose)
+      }
+      expect(css).toContain('--composer-fill:color-mix(in srgb,#2A2A2A 94%,transparent)')
+    }
+    expect(gray?.customCSS).toContain('#768390')
+    expect(warm?.customCSS).toContain('#768390')
+  })
+})
