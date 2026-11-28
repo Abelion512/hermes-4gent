@@ -1,10 +1,5 @@
 name: Desktop verify (standard runners)
 
-# TEMPORARY DIAGNOSTIC COMMIT: the unit shards, the full E2E and the verdict job are removed in this commit only
-# to avoid repeating the failing full suite while the composer hit-test failure is diagnosed. The full file is
-# restored afterwards. The verdict is NOT passed by this run. The diag spec is written at run time into the CI
-# checkout only (never committed to the repo) and prints the page state next to the failing check.
-
 # Draft. No cache saves, no artifacts, no secrets. Visual snapshot diffs never fail the run (see e2e/visual-snapshot.ts). Standard GitHub-hosted runners only, no secrets, no publish, no deploy.
 # Mirrors the repo's own desktop commands (apps/desktop package.json scripts, justfile).
 on:
@@ -57,10 +52,39 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm run typecheck
 
-  e2e-diag:
-    name: DIAGNOSTIC ONLY, composer hit-test dump, not a verdict input
+  unit:
+    name: Unit tests (ui project, shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: node
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install desktop workspace (no lifecycle scripts)
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter "./apps/desktop..." --filter "./apps/shared" --filter "./tests-js"
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Unit tests (shard ${{ matrix.shard }}/4 of the ui project)
+        working-directory: apps/desktop
+        run: pnpm exec vitest run --project ui --shard=${{ matrix.shard }}/4
+
+  e2e:
+    name: Build and Playwright E2E (Electron under xvfb)
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
@@ -87,57 +111,32 @@ jobs:
           echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
       - name: Prepare locked Electron runtime
         run: node scripts/build/electron-runtime.mjs --source .
-      - name: Build, then composer hit-test diagnostic on the live fixture (diagnostic only)
+      - name: Build, then Playwright E2E
         working-directory: apps/desktop
         env:
           CI: 'true'
+          # The PM test environment lives under RUNNER_TEMP, not in <repo>/.venv. The app resolves its Python from
+          # HERMES_DESKTOP_PYTHON or <repo>/.venv, so without it the app never finds a runtime and sits on the setup overlay.
+          # The step below exports it from the PM environment's HERMES_PYTHON and fails fast if that is missing.
           OPENROUTER_API_KEY: ''
           OPENAI_API_KEY: ''
           NOUS_API_KEY: ''
         run: |
+          if [ -z "${HERMES_PYTHON:-}" ] || [ ! -x "$HERMES_PYTHON" ]; then
+            echo "HERMES_PYTHON is not set to an executable interpreter: ${HERMES_PYTHON:-unset}"; exit 1
+          fi
+          export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
+          echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
           pnpm run build
-          echo "runtime-prereq: venv-dir=$([ -d ../../.venv ] && echo yes || echo no) hermes-on-path=$(command -v hermes >/dev/null 2>&1 && echo yes || echo no) python=$(command -v python3 || echo none)"
-          cat > e2e/zz-diag.spec.ts <<'SPEC'
-          import { setupMockBackend } from './fixtures'
-          import { test } from './test'
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list
 
-          test('DIAG composer hit test on the live fixture', async () => {
-            test.setTimeout(150000)
-            const f = await setupMockBackend()
-            try {
-              await f.page.waitForSelector('[data-slot="composer-root"]', { timeout: 90000 }).catch(() => undefined)
-              await f.page.waitForTimeout(20000)
-              const win = await f.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().map((w) => ({ bounds: w.getBounds(), visible: w.isVisible(), focused: w.isFocused(), minimized: w.isMinimized() }))).catch((e) => String(e))
-              const dom = await f.page.evaluate(() => {
-                const rect = (el) => { const r = el.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] }
-                const desc = (el) => { const cs = getComputedStyle(el); return { tag: el.tagName, id: el.id || undefined, slot: el.getAttribute('data-slot') || undefined, cls: String(el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className).slice(0, 90), rect: rect(el), pos: cs.position, z: cs.zIndex, pe: cs.pointerEvents, op: cs.opacity, vis: cs.visibility } }
-                const root = document.querySelector('[data-slot="composer-root"]')
-                const ed = root ? root.querySelector('[contenteditable="true"]') : null
-                const out = { viewport: [innerWidth, innerHeight, devicePixelRatio], visibility: document.visibilityState, hasFocus: document.hasFocus(), scroll: [document.scrollingElement.scrollTop, document.scrollingElement.scrollLeft], rootRect: root ? rect(root) : null, editorRect: ed ? rect(ed) : null, editorDesc: ed ? desc(ed) : null }
-                if (ed) {
-                  const r = ed.getBoundingClientRect()
-                  const x = r.left + r.width / 2
-                  const y = r.top + r.height / 2
-                  out.center = [Math.round(x), Math.round(y)]
-                  out.stack = document.elementsFromPoint(x, y).slice(0, 8).map(desc)
-                  out.overlayText = document.elementsFromPoint(x, y).slice(0, 3).map((e) => String(e.innerText || '').replace(/\s+/g, ' ').slice(0, 500))
-                  const hit = document.elementFromPoint(x, y)
-                  out.hitIsInsideEditor = !!hit && ed.contains(hit)
-                }
-                out.bigFixed = [...document.querySelectorAll('body *')].filter((el) => { const cs = getComputedStyle(el); if (cs.position !== 'fixed' && cs.position !== 'absolute') return false; const r = el.getBoundingClientRect(); return r.width > innerWidth * 0.5 && r.height > innerHeight * 0.5 && cs.visibility !== 'hidden' && cs.display !== 'none' }).slice(0, 8).map(desc)
-                out.dialogs = [...document.querySelectorAll('[role=dialog],[data-slot*=overlay],[data-slot*=dialog],[data-tour]')].slice(0, 8).map(desc)
-                return out
-              })
-              console.log('DIAG-WINDOW ' + JSON.stringify(win))
-              console.log('DIAG-DOM ' + (process.env.HERMES_DESKTOP_PYTHON ? 'variant=python-env ' : 'variant=default ') + JSON.stringify(dom))
-            } finally {
-              await f.cleanup()
-            }
-          })
-          SPEC
-          echo "DIAG-ENV repo-venv=$([ -x ../../.venv/bin/python ] && echo yes || echo no) repo-venv2=$([ -x ../../venv/bin/python ] && echo yes || echo no) VIRTUAL_ENV=${VIRTUAL_ENV:-unset} HERMES_PYTHON=${HERMES_PYTHON:-unset} HERMES_HOME=${HERMES_HOME:-unset}"
-          ls -la ../.. | grep -i 'venv' || echo 'DIAG-ENV no venv entry in repo root'
-          ls "${VIRTUAL_ENV:-/nonexistent}/bin/python" 2>&1 | head -1
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1 || true
-          echo 'DIAG variant B: same probe with HERMES_DESKTOP_PYTHON pointing at the PM interpreter (env prerequisite only)'
-          HERMES_DESKTOP_PYTHON="${HERMES_PYTHON:-${VIRTUAL_ENV:-/nonexistent}/bin/python}" xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1 || true
+  verdict:
+    name: Overall result (requires static, all unit shards and E2E)
+    needs: [static, unit, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "static=${{ needs.static.result }} unit=${{ needs.unit.result }} e2e=${{ needs.e2e.result }}"
+          test "${{ needs.static.result }}" = success && test "${{ needs.unit.result }}" = success && test "${{ needs.e2e.result }}" = success
