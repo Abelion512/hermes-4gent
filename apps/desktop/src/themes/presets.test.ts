@@ -99,6 +99,10 @@ describe('Paper themes', () => {
     expect(gray?.customCSS).not.toContain('#CCC5B8')
     expect(gray?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
     expect(warm?.customCSS).toContain('html.dark{--ui-stroke-primary:#7A7A7A')
+    for (const css of [gray?.customCSS, warm?.customCSS]) {
+      for (const rose of ['#2A2223', '#272021', '#322829', '#EFE4E3']) expect(css).not.toContain(rose)
+      expect(css).toContain('--composer-fill:color-mix(in srgb,#2A2A2A 94%,transparent)')
+    }
     expect(gray?.customCSS).toContain('#768390')
     expect(warm?.customCSS).toContain('#768390')
   })
