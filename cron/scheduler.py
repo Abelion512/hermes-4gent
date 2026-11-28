@@ -2544,8 +2544,10 @@ def run_job(
             return early
         from run_agent import AIAgent
 
-        logger.info("Running job '%s' (ID: %s)", job_name, job_id)
-        logger.info("Prompt: %s", prompt[:100])
+        # Job name falls back to the prompt (cron/jobs.py::_normalize_job_record), and the prompt
+        # itself may carry credentials — log only the id and a length, never the text.
+        logger.info("Running job (ID: %s)", job_id)
+        logger.info("Prompt: %d chars", len(prompt))
         scope = _CronRunScope(job, job_id, execution_id)
         scope.enter()
         if scope.workdir:

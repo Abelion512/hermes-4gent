@@ -1766,9 +1766,11 @@ def _unresolved_delivery_outcome(job: dict, for_failure: bool, skipped: list) ->
             # so failing here would make every CLI `deliver=origin` (or auto-detect) job emit a spurious "no
             # delivery target resolved" error on every run (#43014). The output is still persisted in
             # last_output for `cron list`/resume.
+            # Job name falls back to the prompt prefix (cron/jobs.py::_normalize_job_record), so the
+            # id is the only safe identifier to log here.
             "Job '%s': deliver=origin but no origin or home channels — "
             "skipping delivery (output saved in last_output)",
-            job.get("name", job.get("id", "?")))
+            job.get("id", "?"))
         return None
     msg = "; ".join([f"no delivery target resolved for deliver={deliver_value}", *skipped])
     logger.warning("Job '%s': %s", job["id"], msg)

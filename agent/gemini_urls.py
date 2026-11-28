@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+_GEMINI_STUDIO_HOST = "generativelanguage.googleapis.com"
+_VERTEX_EXPRESS_HOST = "aiplatform.googleapis.com"
 # A Vertex AI express-mode base, when the user configures one explicitly: aiplatform serves the
 # same native API under ``{version}/publishers/google/models/…``; the base carries that prefix so
 # every ``{base}/models/{model}:…`` builder (chat, tier probe, TTS) needs no path branching.
@@ -21,13 +24,35 @@ VERTEX_EXPRESS_BASE_URL = "https://aiplatform.googleapis.com/v1beta1/publishers/
 _API_VERSION_SEGMENT = re.compile(r"^v\d++(?:(?:alpha|beta)\d*)?$", re.IGNORECASE)
 
 
+def _base_url_hostname(base_url: Any) -> str:
+    """Lowercased URL hostname without the trailing dot, or ``""`` if absent.
+
+    Substring checks on the whole URL accepted lookalikes such as
+    ``generativelanguage.googleapis.com.evil.example``. ``urlparse`` ignores credentials and
+    ports; the scheme-less form is common for configured host roots.
+    """
+    raw = str(base_url or "").strip()
+    if not raw:
+        return ""
+    try:
+        parsed = urlparse(raw if "://" in raw else f"//{raw}")
+        return (parsed.hostname or "").lower().rstrip(".")
+    except ValueError:  # malformed bracketed host or authority
+        return ""
+
+
+def is_gemini_studio_base_url(base_url: Any) -> bool:
+    """True only for the exact Google AI Studio (generativelanguage) hostname."""
+    return _base_url_hostname(base_url) == _GEMINI_STUDIO_HOST
+
+
 def is_vertex_express_base_url(base_url: str) -> bool:
     """An aiplatform host speaking the native API with an API key: the bare express surface, or its
     ``…/projects/{p}/locations/{l}`` form, which reaches models served only in ``global`` (Gemini 4).
     The OAuth Vertex provider's ``…/endpoints/openapi`` base is OpenAI-compatible and must stay off
     the native adapter."""
     normalized = str(base_url or "").strip().lower()
-    return "aiplatform.googleapis.com" in normalized and "/endpoints/" not in normalized
+    return _base_url_hostname(base_url) == _VERTEX_EXPRESS_HOST and "/endpoints/" not in normalized
 
 
 def normalize_gemini_base_url(base_url: Optional[str]) -> str:
@@ -64,13 +89,13 @@ def is_native_gemini_base_url(base_url: str) -> bool:
     normalized = str(base_url or "").strip().rstrip("/").lower()
     if normalized.endswith("/openai"):
         return False
-    return "generativelanguage.googleapis.com" in normalized or is_vertex_express_base_url(normalized)
+    return is_gemini_studio_base_url(base_url) or is_vertex_express_base_url(base_url)
 
 
 def is_gemini_openai_compat_base_url(base_url: Any) -> bool:
     """True for Google AI Studio's OpenAI-compatible ``…/openai`` subpath."""
     normalized = str(base_url or "").strip().rstrip("/").lower()
-    return bool(normalized) and "generativelanguage.googleapis.com" in normalized and normalized.endswith("/openai")
+    return bool(normalized) and is_gemini_studio_base_url(base_url) and normalized.endswith("/openai")
 
 
 def gemini_accepts_parameters_json_schema(base_url: str) -> bool:

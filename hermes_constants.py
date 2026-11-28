@@ -5,6 +5,7 @@ Import-safe, stdlib-only — importable from anywhere without circular-import ri
 
 import contextlib
 import errno
+import logging
 import os
 import re
 import shutil
@@ -398,12 +399,90 @@ def profile_name_for_home(path: str | Path | None) -> str | None:
     return None
 
 
+def _refuse_profile_path(reason: str) -> None:
+    """Log a refusal without the rejected path: a request path can carry a credential."""
+    logging.getLogger(__name__).warning("Refused profile path: %s", reason)
+
+
+def _allowed_profile_roots() -> tuple[Path, ...]:
+    """Roots whose subtrees this process may treat as Hermes homes and named profiles."""
+    roots: list[Path] = []
+    for home in (get_hermes_home(), get_default_hermes_root(), sudo_invoker_default_home()):
+        if home is None:
+            continue
+        # A named profile's root is its profiles/ parent; a default or custom home's is itself.
+        candidates = (home, home.parent if home.parent.name == "profiles" else home / "profiles")
+        for candidate in candidates:
+            with contextlib.suppress(OSError, RuntimeError, TypeError, ValueError):
+                roots.append(candidate.resolve(strict=False))
+    return tuple(roots)
+
+
+def _sanitize_profile_path_input(path: str | Path) -> str:
+    """Return a validated path string suitable for Path(...), or raise ValueError."""
+    if not isinstance(path, (str, os.PathLike)):
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    try:
+        raw = os.fspath(path)
+    except (TypeError, ValueError, OSError, RuntimeError):
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    if not isinstance(raw, str) or not raw.strip() or "\x00" in raw:
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    return raw
+
+
+def _confined_profile_path(path: str | Path) -> Path:
+    """Resolve *path* only when it stays inside an allowlisted Hermes tree.
+
+    Refuses relative and traversing paths and symlinks that leave the tree. All refusal
+    routes share ``ValueError``; predicates map it to False and never try a broader path.
+    """
+    try:
+        raw = _sanitize_profile_path_input(path)
+        if not os.path.isabs(raw) or ".." in re.split(r"[/\\]", raw):
+            _refuse_profile_path("relative or traversing path")
+            raise ValueError("relative or traversing path")
+        # Normalize before the containment check so a ``..`` segment or symlink cannot make a
+        # path that merely starts with a root escape it. The Path is built only after the
+        # string has been confined to an allowlisted root.
+        normalized = os.path.realpath(os.path.expanduser(raw))
+    except (TypeError, ValueError, OSError, RuntimeError):
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    for root in _allowed_profile_roots():
+        root_path = os.path.realpath(os.fspath(root))
+        try:
+            inside = os.path.commonpath((root_path, normalized)) == root_path
+        except ValueError:  # different drives on Windows
+            continue
+        if inside:
+            # A profiles root is not itself a profile: require at least one level below it.
+            if os.path.basename(root_path) != "profiles" or normalized != root_path:
+                return Path(normalized)
+    # Sibling roots this process did not launch from (plugin discovery, backup archives) are
+    # admitted only when a ``profiles`` ancestor is provably a Hermes root. A marker file in an
+    # arbitrary ``profiles`` directory is self-attestation, not ownership evidence.
+    candidate = Path(normalized)
+    for parent in candidate.parents:
+        if parent.name == "profiles" and _is_hermes_profiles_root(parent):
+            return candidate
+    _refuse_profile_path("outside an allowed Hermes root")
+    raise ValueError("outside an allowed Hermes root")
+
+
 def profile_tombstone_path(profile_home: Path) -> Path:
     return profile_home.parent / _DELETED_PROFILES_DIR / profile_home.name
 
 
 def named_profile_is_deleted(profile_home: str | Path) -> bool:
-    return profile_tombstone_path(Path(profile_home)).exists()
+    try:
+        home = _confined_profile_path(profile_home)
+    except ValueError:
+        return False
+    return profile_tombstone_path(home).exists()
 
 
 # A directory under profiles/ is a profile only when something identifies it as one.
@@ -418,7 +497,10 @@ PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 def named_profile_has_identity(profile_home: str | Path) -> bool:
     # A dangling symlinked marker (clone/migration leftover) is still an identity claim:
     # ``is_file()`` follows links, so it alone would make such a profile unlistable.
-    home = Path(profile_home)
+    try:
+        home = _confined_profile_path(profile_home)
+    except ValueError:
+        return False
     return any((home / marker).is_file() or (home / marker).is_symlink() for marker in _PROFILE_IDENTITY_MARKERS)
 
 
@@ -431,7 +513,10 @@ def named_profile_has_servable_identity(profile_home: str | Path) -> bool:
     is not — it flips the whole host's credential reads fail-closed at the next boot. Every other
     marker, and a non-empty or symlinked ``.env``, still counts.
     """
-    home = Path(profile_home)
+    try:
+        home = _confined_profile_path(profile_home)
+    except ValueError:
+        return False
     for marker in _PROFILE_IDENTITY_MARKERS:
         path = home / marker
         if path.is_symlink():
@@ -448,7 +533,10 @@ def named_profile_is_live(profile_home: str | Path) -> bool:
     """A resolvable named profile: an existing dir with identity that has not been deleted.
     ``-p``/``--profile`` resolution and ``profile_exists`` share this so a stale ghost shell can
     never be started as a backend (whose ``ensure_hermes_home`` would rebuild the full tree)."""
-    home = Path(profile_home)
+    try:
+        home = _confined_profile_path(profile_home)
+    except ValueError:
+        return False
     return home.is_dir() and named_profile_has_identity(home) and not named_profile_is_deleted(home)
 
 
@@ -459,7 +547,10 @@ TOMBSTONE_DELETED = b"deleted\n"
 
 def named_profile_delete_incomplete(profile_home: str | Path) -> bool:
     """A tombstoned home left by a delete, even if rmtree already removed its identity files."""
-    home = Path(profile_home)
+    try:
+        home = _confined_profile_path(profile_home)
+    except ValueError:
+        return False
     if not home.is_dir() or not named_profile_is_deleted(home):
         return False
     if named_profile_has_identity(home):  # legacy tombstones from before delete recorded its state

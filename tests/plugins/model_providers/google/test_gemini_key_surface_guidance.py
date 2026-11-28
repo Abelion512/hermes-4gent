@@ -13,7 +13,16 @@ from __future__ import annotations
 
 import json
 from unittest.mock import MagicMock
+from urllib.parse import urlparse
 
+import pytest
+
+from agent.gemini_urls import (
+    is_gemini_openai_compat_base_url,
+    is_gemini_studio_base_url,
+    is_native_gemini_base_url,
+    is_vertex_express_base_url,
+)
 from plugins.model_providers.google.native_adapter import gemini_http_error, wrong_gemini_surface_guidance
 
 # Concatenated so the file never contains a contiguous real-format key.
@@ -32,6 +41,20 @@ def _mock_response(status: int, body: str) -> MagicMock:
     return resp
 
 
+def _guidance_hosts(text: str) -> set[str]:
+    """Hosts parsed from guidance text; compare hosts instead of URL substrings."""
+    hosts = set()
+    for token in text.split():
+        candidate = token.strip(".,;:()[]")
+        if "." not in candidate:
+            continue
+        parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if "." in host and host.rsplit(".", 1)[-1].isalpha():
+            hosts.add(host)
+    return hosts
+
+
 def _permission_denied_body() -> str:
     return json.dumps({
         "error": {
@@ -41,6 +64,48 @@ def _permission_denied_body() -> str:
             "status": "PERMISSION_DENIED",
         }
     })
+
+
+class TestGeminiHostIdentity:
+    """URL host checks must compare parsed hostnames, not URL substrings."""
+
+    @pytest.mark.parametrize("base_url", [
+        "https://generativelanguage.googleapis.com.evil.example/v1beta",
+        "https://evil.example/generativelanguage.googleapis.com/v1beta",
+        "https://api.openai.com.evil.example/v1",
+    ])
+    def test_studio_host_check_rejects_lookalikes(self, base_url):
+        assert is_gemini_studio_base_url(base_url) is False
+
+    @pytest.mark.parametrize("base_url", [
+        "https://generativelanguage.googleapis.com/v1beta",
+        "https://USER:pass@GENERATIVELANGUAGE.GOOGLEAPIS.COM.:443/v1beta",
+        "generativelanguage.googleapis.com/v1beta",
+    ])
+    def test_studio_host_check_accepts_exact_host_variants(self, base_url):
+        assert is_gemini_studio_base_url(base_url) is True
+
+    @pytest.mark.parametrize("base_url", [
+        "https://aiplatform.googleapis.com.evil.example/v1beta1",
+        "https://evil.example/aiplatform.googleapis.com/v1beta1",
+        "https://aiplatform.googleapis.com.evil.example/v1beta1/endpoints/openapi",
+    ])
+    def test_vertex_express_check_rejects_lookalikes(self, base_url):
+        assert is_vertex_express_base_url(base_url) is False
+
+    def test_vertex_express_check_accepts_credentials_port_and_trailing_dot(self):
+        base = "https://user:pw@AIPLATFORM.GOOGLEAPIS.COM.:443/v1beta1"
+        assert is_vertex_express_base_url(base) is True
+        assert is_native_gemini_base_url(base) is True
+
+    @pytest.mark.parametrize("check", [is_native_gemini_base_url, is_gemini_openai_compat_base_url])
+    def test_other_gemini_checks_reject_studio_lookalikes(self, check):
+        base = "https://generativelanguage.googleapis.com.evil.example/v1beta/openai"
+        assert check(base) is False
+
+    def test_openai_compat_check_accepts_credentials_port_and_trailing_dot(self):
+        base = "https://user:pw@GENERATIVELANGUAGE.GOOGLEAPIS.COM.:443/v1beta/openai"
+        assert is_gemini_openai_compat_base_url(base) is True
 
 
 class TestWrongGeminiSurfaceGuidance:
@@ -53,8 +118,20 @@ class TestWrongGeminiSurfaceGuidance:
         text = wrong_gemini_surface_guidance(
             _EXPRESS_BASE, _AQ_KEY, "PERMISSION_DENIED"
         )
-        assert text and "generativelanguage.googleapis.com" in text
-        assert "aistudio.google.com" in text
+        hosts = _guidance_hosts(text)
+        assert hosts == {"generativelanguage.googleapis.com", "aistudio.google.com"}
+
+    def test_aq_key_on_studio_lookalike_gets_no_guidance(self):
+        base = "https://generativelanguage.googleapis.com.evil.example/v1beta"
+        assert wrong_gemini_surface_guidance(base, _AQ_KEY, "PERMISSION_DENIED") == ""
+
+    def test_aq_key_on_express_lookalike_gets_no_guidance(self):
+        base = "https://aiplatform.googleapis.com.evil.example/v1beta1"
+        assert wrong_gemini_surface_guidance(base, _AQ_KEY, "PERMISSION_DENIED") == ""
+
+    def test_aq_key_on_exact_studio_host_with_port_and_trailing_dot_gets_guidance(self):
+        base = "https://user:pw@GENERATIVELANGUAGE.GOOGLEAPIS.COM.:443/v1beta"
+        assert wrong_gemini_surface_guidance(base, _AQ_KEY, "PERMISSION_DENIED")
 
     def test_non_permission_denied_status_gets_no_guidance(self):
         assert (
