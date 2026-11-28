@@ -442,36 +442,36 @@ export const slateTheme: DesktopTheme = {
 }
 
 /**
- * Paper - warm off-white paper with a terracotta accent, lifted from the
+ * Paper - dimmed warm gray-brown paper (no near-white surfaces) with a terracotta accent, lifted from the
  * headphone-showdown reference page the user picked. Broad surfaces sit on the
  * paper tone so long sessions stay low-glare; every text pair is WCAG AA+. Ships a dimmed light and a dark palette.
  * Tokens without a reference source are marked derived.
  */
 const PAPER_LIGHT_COLORS: DesktopThemeColors = {
-  background: '#E9E6DE', // dimmed one step from the reference paper for low glare
+  background: '#CFC9BC', // dimmed warm gray-brown paper; no surface approaches white
   foreground: '#191816',
-  card: '#F3F0EA',
+  card: '#DAD5C9',
   cardForeground: '#191816',
-  muted: '#DFDCD3', // derived: one step darker than the paper tone
-  mutedForeground: '#5C5850',
-  popover: '#F3F0EA',
+  muted: '#C4BEB1', // derived: one step darker than the paper tone
+  mutedForeground: '#46423B',
+  popover: '#DAD5C9',
   popoverForeground: '#191816',
-  primary: '#9C4A34',
+  primary: '#7F3D2B',
   primaryForeground: '#FFFFFF', // derived: reference has no buttons
-  secondary: '#EFE2D8',
+  secondary: '#D8C6B8',
   secondaryForeground: '#514D46',
-  accent: '#EFE2D8',
-  accentForeground: '#8B3C28',
-  border: '#D6D1C5',
-  input: '#D6D1C5',
-  ring: '#9C4A34',
-  midground: '#9C4A34',
-  destructive: '#8B3C28', // derived: dark accent doubles as the danger hue
+  accent: '#D8C6B8',
+  accentForeground: '#7A3623',
+  border: '#B3AC9D',
+  input: '#B3AC9D',
+  ring: '#7F3D2B',
+  midground: '#7F3D2B',
+  destructive: '#7A3623', // derived: dark accent doubles as the danger hue
   destructiveForeground: '#FFFFFF',
-  sidebarBackground: '#DFDCD3', // derived: reference page has no sidebar
-  sidebarBorder: '#D6D1C5',
-  userBubble: '#EFE2D8', // derived: reference has no chat UI
-  userBubbleBorder: '#DCC6B8'
+  sidebarBackground: '#C4BEB1', // derived: reference page has no sidebar
+  sidebarBorder: '#B3AC9D',
+  userBubble: '#D8C6B8', // derived: reference has no chat UI
+  userBubbleBorder: '#BFA897'
 }
 
 /** Dark counterpart: same warm terracotta family on a dim rose-black canvas. */
@@ -525,10 +525,11 @@ export const paperTheme: DesktopTheme = {
     '--ui-chat-bubble-opaque-background:var(--theme-bubble-seed);' +
     '}' +
     'html:not(.dark){' +
-    '--ui-bg-input:#FAF8F3;' +
-    '--ui-bg-elevated:#FAF8F3 !important;' +
-    '--dt-card:#FAF8F3 !important;' +
-    '--dt-popover:color-mix(in srgb,#FAF8F3 96%,transparent) !important;' +
+    '--ui-bg-input:#DAD5C9;' +
+    '--ui-bg-elevated:#DAD5C9 !important;' +
+    '--ui-bg-editor:#DFDACF !important;' +
+    '--dt-card:#DAD5C9 !important;' +
+    '--dt-popover:color-mix(in srgb,#DAD5C9 96%,transparent) !important;' +
     '}' +
     'html.dark{' +
     '--ui-bg-input:#2A2223;' +
@@ -538,13 +539,13 @@ export const paperTheme: DesktopTheme = {
     '}' +
     // Element-scoped composer rules redeclare --composer-fill and beat :root.
     'html:not(.dark) [data-slot="composer-root"],html:not(.dark) [data-hud-shell] [data-slot="composer-root"],html:not(.dark) [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
-    '--composer-fill:color-mix(in srgb,#FBF9F4 92%,transparent) !important;' +
+    '--composer-fill:color-mix(in srgb,#DAD5C9 92%,transparent) !important;' +
     '}' +
     'html.dark [data-slot="composer-root"],html.dark [data-hud-shell] [data-slot="composer-root"],html.dark [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#322829 94%,transparent) !important;' +
     '}' +
     // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
-    'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#8B3C28 !important;--theme-primary:#8B3C28;}' +
+    'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#7A3623 !important;--theme-primary:#7A3623;}' +
     'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D9887A !important;--theme-primary:#D9887A;}' +
     // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
     'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EFE4E3 72%,transparent) !important;}' +
