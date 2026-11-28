@@ -724,6 +724,13 @@ class TestNamedProfilePathConfinement:
         assert not hermes_constants.named_profile_has_identity(link)
         assert not hermes_constants.named_profile_is_deleted(link)
 
+    def test_marker_in_unrelated_profiles_dir_is_not_ownership(self, hermes_root, tmp_path):
+        fake_root = tmp_path / "unrelated"
+        outside = self._seed(fake_root / "profiles" / "rogue")
+
+        assert not hermes_constants.named_profile_is_live(outside)
+        assert not hermes_constants.named_profile_has_identity(outside)
+
     def test_refusal_log_has_no_path(self, hermes_root, tmp_path, caplog):
         outside = self._seed(tmp_path / "rogue-token-SECRETVALUE")
         with caplog.at_level(logging.WARNING, logger="hermes_constants"):

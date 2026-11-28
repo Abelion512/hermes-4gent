@@ -49,8 +49,9 @@ def _guidance_hosts(text: str) -> set[str]:
         if "." not in candidate:
             continue
         parsed = urlparse(candidate if "://" in candidate else f"//{candidate}")
-        if parsed.hostname:
-            hosts.add(parsed.hostname.lower().rstrip("."))
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if "." in host and host.rsplit(".", 1)[-1].isalpha():
+            hosts.add(host)
     return hosts
 
 
@@ -118,8 +119,7 @@ class TestWrongGeminiSurfaceGuidance:
             _EXPRESS_BASE, _AQ_KEY, "PERMISSION_DENIED"
         )
         hosts = _guidance_hosts(text)
-        assert "generativelanguage.googleapis.com" in hosts
-        assert "aistudio.google.com" in hosts
+        assert hosts == {"generativelanguage.googleapis.com", "aistudio.google.com"}
 
     def test_aq_key_on_studio_lookalike_gets_no_guidance(self):
         base = "https://generativelanguage.googleapis.com.evil.example/v1beta"

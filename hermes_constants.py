@@ -442,35 +442,33 @@ def _confined_profile_path(path: str | Path) -> Path:
     """
     try:
         raw = _sanitize_profile_path_input(path)
-        candidate = Path(raw).expanduser()
+        if not os.path.isabs(raw) or ".." in re.split(r"[/\\]", raw):
+            _refuse_profile_path("relative or traversing path")
+            raise ValueError("relative or traversing path")
+        # Normalize before the containment check so a ``..`` segment or symlink cannot make a
+        # path that merely starts with a root escape it. The Path is built only after the
+        # string has been confined to an allowlisted root.
+        normalized = os.path.realpath(os.path.expanduser(raw))
     except (TypeError, ValueError, OSError, RuntimeError):
         _refuse_profile_path("unreadable path")
         raise ValueError("unreadable path")
-    if not candidate.is_absolute() or ".." in candidate.parts:
-        _refuse_profile_path("relative or traversing path")
-        raise ValueError("relative or traversing path")
-    try:
-        resolved = candidate.resolve(strict=False)
-    except (OSError, RuntimeError, TypeError, ValueError):
-        _refuse_profile_path("unresolvable path")
-        raise ValueError("unresolvable path")
     for root in _allowed_profile_roots():
-        if root == resolved or root in resolved.parents:
+        root_path = os.path.realpath(os.fspath(root))
+        try:
+            inside = os.path.commonpath((root_path, normalized)) == root_path
+        except ValueError:  # different drives on Windows
+            continue
+        if inside:
             # A profiles root is not itself a profile: require at least one level below it.
-            if root.name != "profiles" or root != resolved:
-                return resolved
+            if os.path.basename(root_path) != "profiles" or normalized != root_path:
+                return Path(normalized)
     # Sibling roots this process did not launch from (plugin discovery, backup archives) are
-    # admitted only with ownership evidence: a provable Hermes root, or a profiles/<name> leaf
-    # carrying its own identity or tombstone. A bare path-shaped string is never enough.
-    for parent in (resolved, *resolved.parents):
-        if parent == resolved:
-            continue
-        if parent.name != "profiles":
-            continue
-        if (_is_hermes_profiles_root(parent)
-                or any((resolved / marker).exists() for marker in _PROFILE_IDENTITY_MARKERS)
-                or profile_tombstone_path(resolved).exists()):
-            return resolved
+    # admitted only when a ``profiles`` ancestor is provably a Hermes root. A marker file in an
+    # arbitrary ``profiles`` directory is self-attestation, not ownership evidence.
+    candidate = Path(normalized)
+    for parent in candidate.parents:
+        if parent.name == "profiles" and _is_hermes_profiles_root(parent):
+            return candidate
     _refuse_profile_path("outside an allowed Hermes root")
     raise ValueError("outside an allowed Hermes root")
 
