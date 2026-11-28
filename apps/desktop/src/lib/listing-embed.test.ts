@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hostLabel, parseListings } from './listing-embed'
+import { hostLabel, isProductSet, parseListings } from './listing-embed'
 
 // Shaped like what the agent actually emits after a portal sweep.
 const REAL = JSON.stringify({
@@ -97,6 +97,34 @@ describe('parseListings', () => {
     const [listing] = parseListings('{"address":"x","facts":"private dock"}')
 
     expect(listing.facts).toEqual(['private dock'])
+  })
+})
+
+describe('product variant', () => {
+  it('keeps legacy listings on the property card', () => {
+    const [listing] = parseListings(REAL)
+
+    expect(listing.variant).toBe('listing')
+    expect(listing.pros).toEqual([])
+    expect(isProductSet(parseListings(REAL))).toBe(false)
+  })
+
+  it('opts in with kind: product and reads pros', () => {
+    const listings = parseListings(
+      '[{"kind":"Product","title":"Laptop A","pros":["Light","OLED"],"price":"Rp 15.000.000"}]'
+    )
+
+    expect(listings[0].variant).toBe('product')
+    expect(listings[0].pros).toEqual(['Light', 'OLED'])
+    expect(isProductSet(listings)).toBe(true)
+  })
+
+  it('a mixed fence stays on the legacy cards', () => {
+    expect(isProductSet(parseListings('[{"kind":"product","title":"A"},{"address":"1 Main St"}]'))).toBe(false)
+  })
+
+  it('takes a single string for pros', () => {
+    expect(parseListings('{"title":"A","pros":"Light"}')[0].pros).toEqual(['Light'])
   })
 })
 

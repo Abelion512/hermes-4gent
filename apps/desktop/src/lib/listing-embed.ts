@@ -51,8 +51,16 @@ export interface Listing {
   images: string[]
   /** Canonical detail-page links; multiple portals mirror one property. */
   links: ListingLink[]
+  /** Why it earns the pick ("Fast charging") — the upside twin of `catches`. */
+  pros: string[]
   /** Stable key for React lists. */
   id: string
+  /**
+   * `product` opts into the compact card + detail popup (shopping, places).
+   * Absent or anything else stays the original property card, so existing
+   * rental/real-estate fences render exactly as before.
+   */
+  variant: 'listing' | 'product'
 }
 
 function text(value: unknown): string | undefined {
@@ -198,7 +206,9 @@ function normalizeListing(raw: unknown, index: number): Listing | null {
     links: linkList(source.links ?? source.url),
     note: text(source.note) ?? text(source.why),
     price: text(source.price),
-    size: text(source.size) ?? text(source.sqft)
+    pros: stringList(source.pros),
+    size: text(source.size) ?? text(source.sqft),
+    variant: text(source.kind)?.toLowerCase() === 'product' ? 'product' : 'listing'
   }
 }
 
@@ -234,6 +244,11 @@ export function parseListings(code: string): Listing[] {
   }
 
   return listings
+}
+
+/** A fence renders as the compact product row only when every card opts in. */
+export function isProductSet(listings: Listing[]): boolean {
+  return listings.length > 0 && listings.every(listing => listing.variant === 'product')
 }
 
 /** The metadata line under the address: "3 bd · 2.5 ba · 2,136 sqft". */

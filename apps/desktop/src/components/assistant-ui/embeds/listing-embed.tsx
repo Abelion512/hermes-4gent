@@ -1,17 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { WIDGET_SHELL_CLASS } from '@/components/chat/widget-shell'
-import { ImageLightbox } from '@/components/chat/zoomable-image'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
-import { useImageDownload } from '@/hooks/use-image-download'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
-import { type Listing, parseListings, specLine } from '@/lib/listing-embed'
+import { isProductSet, type Listing, parseListings, specLine } from '@/lib/listing-embed'
 import { cn } from '@/lib/utils'
 
+import { ListingLightbox } from './listing-lightbox'
+import { ProductRow } from './product-row'
 import type { RichFenceProps } from './types'
 
 /** The conversation's own type scale, so a card reads at the prose's size. */
@@ -43,6 +43,12 @@ export default function ListingEmbed({ code, streaming }: RichFenceProps) {
     // Nothing valid parsed: the boundary's fallback (the plain code block) is
     // the honest render. Throwing lets RichBoundary do it.
     throw new Error('listing: no renderable listings')
+  }
+
+  // `kind: "product"` on every entry opts into the compact row + detail popup;
+  // anything else keeps the property cards below untouched.
+  if (isProductSet(listings)) {
+    return <ProductRow listings={listings} />
   }
 
   return (
@@ -139,29 +145,6 @@ function ListingGallery({ address, images }: { address: string; images: string[]
   // Portal CDNs expire URLs; a dead photo drops out of the mosaic rather than
   // leaving a broken frame in the grid.
   const live = images.filter(src => !broken.includes(src))
-  const position = openAt === null ? 0 : Math.min(openAt, live.length - 1)
-  const { download, saving } = useImageDownload(live[position])
-
-  // Page the set inside the lightbox — a full-size photo is the right place
-  // to go through 40 frames, and the arrow keys are what hands reach for.
-  useEffect(() => {
-    if (openAt === null || live.length < 2) {
-      return
-    }
-
-    const onKey = (event: KeyboardEvent) => {
-      const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-
-      if (delta !== 0) {
-        event.preventDefault()
-        setOpenAt(prev => ((prev ?? 0) + delta + live.length) % live.length)
-      }
-    }
-
-    window.addEventListener('keydown', onKey)
-
-    return () => window.removeEventListener('keydown', onKey)
-  }, [live.length, openAt])
 
   if (live.length === 0) {
     return null
@@ -200,15 +183,7 @@ function ListingGallery({ address, images }: { address: string; images: string[]
         ))}
       </span>
 
-      <ImageLightbox
-        alt={address}
-        copy={t.desktop}
-        onClick={download}
-        onOpenChange={open => setOpenAt(open ? position : null)}
-        open={openAt !== null}
-        saving={saving}
-        src={live[position]}
-      />
+      <ListingLightbox alt={address} images={live} onOpenAt={setOpenAt} openAt={openAt} />
     </>
   )
 }
