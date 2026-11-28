@@ -11,6 +11,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
+from hermes_cli import profiles as profiles_mod
 
 from hermes_cli.web_deps import late
 from hermes_cli.web_server_profiles import _plugin_terminal_backend_rows
@@ -24,6 +25,19 @@ from hermes_cli.web_routers._common import (
     config_write_scope, log as _log, scoped_to_thread, spawn_profile_action)
 
 router = APIRouter()
+
+def _validated_optional_profile(profile: Optional[str]) -> Optional[str]:
+    """Canonical validated profile name, or ``None`` for ambient/current profile."""
+    requested = (profile or "").strip()
+    if not requested or requested.lower() == "current":
+        return None
+    try:
+        canon = profiles_mod.normalize_profile_name(requested)
+        profiles_mod.validate_profile_name(canon)
+        return canon
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 
 load_config = late("load_config", "hermes_cli.config")
 save_config = late("save_config", "hermes_cli.config")
@@ -281,7 +295,7 @@ async def toggle_toolset(name: str, body: ToolsetToggle, profile: Optional[str] 
         _toolset_configuration_platform)
 
     target_platform = _toolset_configuration_platform(name)
-    scope_profile = body.profile or profile
+    scope_profile = _validated_optional_profile(body.profile or profile)
 
     def _run():
         with config_write_scope(scope_profile):
@@ -586,8 +600,10 @@ async def save_toolset_env(name: str, body: ToolsetEnvUpdate, profile: Optional[
     can't write arbitrary env vars; a blank value means "leave unchanged"."""
     from hermes_cli.config import get_env_value, save_env_value
 
+    scope_profile = _validated_optional_profile(body.profile or profile)
+
     def _run():
-        with _profile_scope(body.profile or profile):
+        with _profile_scope(scope_profile):
             _require_known_toolset(name)
             config = load_config()
             allowed: set[str] = {
@@ -627,7 +643,7 @@ async def run_toolset_post_setup(
     ``profile`` is threaded so hooks see the drawer's HERMES_HOME."""
     from hermes_cli.tools_config import valid_post_setup_keys
 
-    scope_profile = body.profile or profile
+    scope_profile = _validated_optional_profile(body.profile or profile)
 
     def _validate():
         # Plugin toolsets and plugin providers' post-setup keys are both per profile.
@@ -648,8 +664,10 @@ async def get_terminal_backends(profile: Optional[str] = None):
     """Terminal backend rows with health probes: ``status`` is ``ready`` /
     ``needs_setup`` / ``unavailable``; a probe failure is a status, never an
     error response."""
+    scope_profile = _validated_optional_profile(profile)
+
     def _read():
-        with _profile_scope(profile):
+        with _profile_scope(scope_profile):
             config = load_config()
             terminal_cfg = config.get("terminal")
             if not isinstance(terminal_cfg, dict):
@@ -679,8 +697,10 @@ async def select_terminal_backend(
     are registered per profile."""
     backend = (body.backend or "").strip().lower()
 
+    scope_profile = _validated_optional_profile(body.profile or profile)
+
     def _run():
-        with config_write_scope(body.profile or profile):
+        with config_write_scope(scope_profile):
             valid_names = {row["name"] for row in _terminal_backend_rows()}
             if backend not in valid_names:
                 raise _bad_request(
@@ -700,7 +720,8 @@ async def get_computer_use_status(profile: Optional[str] = None):
     ``tools.computer_use.permissions.computer_use_status``)."""
     from tools.computer_use.permissions import computer_use_status
 
-    return await scoped_to_thread(profile, computer_use_status)
+    scope_profile = _validated_optional_profile(profile)
+    return await scoped_to_thread(scope_profile, computer_use_status)
 
 
 @router.post("/api/tools/computer-use/permissions/grant")
@@ -710,7 +731,8 @@ async def grant_computer_use_permissions(profile: Optional[str] = None):
     The frontend polls ``GET /api/actions/computer-use-grant/status``."""
     if sys.platform != "darwin":
         raise _bad_request("Computer Use permission grants are a macOS concept.")
+    scope_profile = _validated_optional_profile(profile)
     return spawn_profile_action(
-        profile, ["computer-use", "permissions", "grant"], "computer-use-grant",
+        scope_profile, ["computer-use", "permissions", "grant"], "computer-use-grant",
         log_msg="Failed to spawn computer-use permissions grant",
         prefix="Failed to request permissions")
