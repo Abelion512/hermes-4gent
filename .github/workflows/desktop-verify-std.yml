@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-verify-std-${{ github.event.pull_request.number || github.ref }}
+  group: desktop-verify-std-v6-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -121,6 +121,48 @@ jobs:
         run: |
           pnpm run build
           xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test --reporter=list
+
+  e2e-diag:
+    name: DIAGNOSTIC ONLY, 2 specs, not a verdict input
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Electron system libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2t64
+      # The E2E suite boots a real `hermes serve`, so it needs the locked Python test environment too
+      # (same inputs as e2e-desktop.yml, with every cache save turned off).
+      - uses: ./.github/actions/setup-pm
+        with:
+          toolchain: all
+          extras: '["all"]'
+          test-environment: 'true'
+          save-tools-cache: 'false'
+          save-node-cache: 'false'
+          save-python-cache: 'false'
+      - name: Install all workspaces (lifecycle scripts run, node-pty needs its native build)
+        run: pnpm install --frozen-lockfile
+      - name: Runner hardware and toolchain actually in use
+        run: |
+          echo "cpus: $(nproc)"; free -m | head -2
+          echo "node: $(node -v)"; echo "pnpm: $(pnpm -v)"; echo "runner image: ${ImageOS:-?} ${ImageVersion:-?}"
+      - name: Prepare locked Electron runtime
+        run: node scripts/build/electron-runtime.mjs --source .
+      - name: Build, then 2 representative specs (diagnostic only, error blocks print early)
+        working-directory: apps/desktop
+        env:
+          CI: 'true'
+          OPENROUTER_API_KEY: ''
+          OPENAI_API_KEY: ''
+          NOUS_API_KEY: ''
+        run: |
+          pnpm run build
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/chat.spec.ts e2e/connection-version-label.spec.ts --reporter=list --retries=0 --max-failures=2
 
   verdict:
     name: Overall result (requires static, all unit shards and E2E)
