@@ -549,15 +549,16 @@ def _pyproject_uv_sources(pyproject: Path | None) -> frozenset[str] | None:
 
 def _pyproject_install_triggers(pyproject: Path | None) -> tuple[str, ...]:
     """Human-readable names of the ``pyproject.toml`` features that set ``pyproject_installs``."""
+    triggers: list[str] = []
     if pyproject is None:
-        return ()
+        return tuple(triggers)
     try:
         document = tomllib.loads(pyproject.read_text(encoding="utf-8-sig"))
     except (OSError, tomllib.TOMLDecodeError):
-        return ("pyproject.toml",)
+        triggers.append("pyproject.toml")
+        return tuple(triggers)
     metadata = document.get("project", {})
     uv = _uv_table(document)
-    triggers: list[str] = []
     if "build-system" in document:
         triggers.append("[build-system]")
     if uv.get("package") is True:
