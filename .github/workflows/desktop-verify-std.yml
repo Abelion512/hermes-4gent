@@ -96,6 +96,7 @@ jobs:
           NOUS_API_KEY: ''
         run: |
           pnpm run build
+          echo "runtime-prereq: venv-dir=$([ -d ../../.venv ] && echo yes || echo no) hermes-on-path=$(command -v hermes >/dev/null 2>&1 && echo yes || echo no) python=$(command -v python3 || echo none)"
           cat > e2e/zz-diag.spec.ts <<'SPEC'
           import { setupMockBackend } from './fixtures'
           import { test } from './test'
@@ -119,6 +120,7 @@ jobs:
                   const y = r.top + r.height / 2
                   out.center = [Math.round(x), Math.round(y)]
                   out.stack = document.elementsFromPoint(x, y).slice(0, 8).map(desc)
+                  out.overlayText = document.elementsFromPoint(x, y).slice(0, 3).map((e) => String(e.innerText || '').replace(/\s+/g, ' ').slice(0, 500))
                   const hit = document.elementFromPoint(x, y)
                   out.hitIsInsideEditor = !!hit && ed.contains(hit)
                 }
@@ -127,10 +129,15 @@ jobs:
                 return out
               })
               console.log('DIAG-WINDOW ' + JSON.stringify(win))
-              console.log('DIAG-DOM ' + JSON.stringify(dom))
+              console.log('DIAG-DOM ' + (process.env.HERMES_DESKTOP_PYTHON ? 'variant=python-env ' : 'variant=default ') + JSON.stringify(dom))
             } finally {
               await f.cleanup()
             }
           })
           SPEC
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1
+          echo "DIAG-ENV repo-venv=$([ -x ../../.venv/bin/python ] && echo yes || echo no) repo-venv2=$([ -x ../../venv/bin/python ] && echo yes || echo no) VIRTUAL_ENV=${VIRTUAL_ENV:-unset} HERMES_PYTHON=${HERMES_PYTHON:-unset} HERMES_HOME=${HERMES_HOME:-unset}"
+          ls -la ../.. | grep -i 'venv' || echo 'DIAG-ENV no venv entry in repo root'
+          ls "${VIRTUAL_ENV:-/nonexistent}/bin/python" 2>&1 | head -1
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1 || true
+          echo 'DIAG variant B: same probe with HERMES_DESKTOP_PYTHON pointing at the PM interpreter (env prerequisite only)'
+          HERMES_DESKTOP_PYTHON="${HERMES_PYTHON:-${VIRTUAL_ENV:-/nonexistent}/bin/python}" xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/zz-diag.spec.ts --reporter=list --retries=0 --max-failures=1 || true
