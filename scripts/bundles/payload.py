@@ -43,9 +43,19 @@ def _runtime_trees_hidden_by(exclude: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(hidden)
 
 
+def _checked_archive_path(path: str) -> None:
+    """Refuse anything but a relative archive path: ``..``/absolute spellings must never name
+    something outside the revision's tree."""
+    if not path or path.startswith("/") or any(part in ("", ".", "..") for part in path.split("/")):
+        raise ValueError(f"not a safe archive path: {path!r}")
+
+
 def _revision_has_path(repo: Path, ref: str, path: str) -> bool:
-    probe = subprocess.run(  # NOSONAR: argv list, no shell; ref is a verified SHA and path is internal
-        ["git", "cat-file", "-e", f"{ref}:{path}"],
+    _checked_archive_path(path)
+    # --end-of-options: a ref spelled like a git option (leading dash) names a revision, never an
+    # option, so every revision spelling git accepts stays accepted.
+    probe = subprocess.run(  # NOSONAR: argv list, no shell; options sealed, path validated above
+        ["git", "cat-file", "-e", "--end-of-options", f"{ref}:{path}"],
         cwd=repo, check=False, timeout=60,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return probe.returncode == 0
