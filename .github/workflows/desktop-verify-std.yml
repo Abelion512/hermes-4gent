@@ -73,8 +73,16 @@ jobs:
           done <<EOF2
           $changed
           EOF2
+          if printf '%s\n' "$changed" | grep -qx 'apps/desktop/src/themes/presets.ts'; then
+            if ! pd=$(git diff -U0 "$BEFORE" HEAD -- apps/desktop/src/themes/presets.ts); then
+              reason="could not read the presets.ts diff"; finish
+            fi
+            if printf '%s\n' "$pd" | grep -E '^[+-]' | grep -Ev '^(\+\+\+|---)' | grep -Eq 'BUILTIN_THEME|RETIRED_SKINS|DEFAULT_SKIN_NAME|^[+-][[:space:]]*(export|import)[[:space:]]|^[+-][[:space:]]*(name|label|description|typography|fontSans|fontMono):|[A-Za-z]+Theme[,:]|darkColors'; then
+              files=""; reason="presets.ts change touches the theme registry, names or structure, not only palette values"; finish
+            fi
+          fi
           scope=theme
-          reason="every changed path since the previous head is a Paper palette file"
+          reason="every changed path since the previous head is a Paper palette file and presets.ts changed palette values only"
           finish
 
   static:
@@ -257,7 +265,7 @@ jobs:
           node /tmp/summ.cjs
 
   e2e-scoped:
-    name: Build and scoped Playwright E2E (boot and sidebar-states specs only, not the full suite)
+    name: Build and scoped Playwright E2E (smoke and style-sensitive specs, not the full suite)
     needs: [scope, static]
     if: needs.scope.outputs.scope == 'theme'
     runs-on: ubuntu-latest
@@ -312,8 +320,8 @@ jobs:
           export HERMES_DESKTOP_PYTHON="$HERMES_PYTHON"
           echo "HERMES_DESKTOP_PYTHON=$HERMES_DESKTOP_PYTHON"
           pnpm run build
-          echo "SCOPED E2E: boot.spec.ts and sidebar-states.spec.ts only. Skipped: every other spec, including the 27 known baseline failures."
-          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/boot.spec.ts e2e/sidebar-states.spec.ts --reporter=list,json
+          echo "SCOPED E2E: boot, sidebar-states (smoke) and markdown-overflow, sticky-prompt-clip, group-room-native (style/layout sensitive). Known failures in these specs are NOT excluded and fail this job. Skipped: all other specs."
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" pnpm exec playwright test e2e/boot.spec.ts e2e/sidebar-states.spec.ts e2e/markdown-overflow.spec.ts e2e/sticky-prompt-clip.spec.ts e2e/group-room-native.spec.ts --reporter=list,json
       - name: Per-test result list (log and job summary only, no artifact)
         if: always()
         run: |
@@ -596,7 +604,7 @@ jobs:
           fi
           if [ "$SCOPE" = theme ]; then
             if [ "$R_UNIT_S" = success ] && [ "$R_E2E_S" = success ] && [ "$R_UNIT" = skipped ] && [ "$R_E2E" = skipped ]; then
-              echo "RESULT: SCOPED CHECKS PASSED. This is NOT a full pass. Palette-only change ($FILES). Ran: lint, typecheck, vitest related, boot and sidebar-states E2E. Skipped: full unit suite, all other E2E specs. The 27 known baseline E2E failures were not rerun."
+              echo "RESULT: SCOPED CHECKS PASSED. This is NOT a full pass. Palette-only change ($FILES). Ran: lint, typecheck, vitest related, and 5 E2E specs (boot, sidebar-states, markdown-overflow, sticky-prompt-clip, group-room-native). Skipped: full unit suite and the other E2E specs. Executed-test outcome is separate from any baseline comparison."
               exit 0
             fi
             echo "RESULT: SCOPED CHECKS FAILED (unit-scoped=$R_UNIT_S e2e-scoped=$R_E2E_S)"; exit 1
