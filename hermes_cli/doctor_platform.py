@@ -631,7 +631,8 @@ _DECLARATIONS = frozenset({"export", "declare", "typeset", "readonly"})
 _ASSIGNMENT_WORD = re.compile(r"[A-Za-z_]\w*\+?=")
 _DECLARATION_ARGUMENT = re.compile(r"-\S*|[A-Za-z_]\w*(?:\+?=.*)?")  # an option, a name, or NAME=value
 # A redirection (2>/dev/null, > file) is no command word; its target is attached or the next word.
-_REDIRECTION = re.compile(r"\d*[<>]+(.*)")
+# Possessive runs: ``(.*)`` stops at a newline, and without them a failing fullmatch retried every split of the <> run.
+_REDIRECTION = re.compile(r"\d*+[<>]++(.*)")
 # The & and | inside >&, <&, >| and &> belong to the redirection, not a command separator: split them off.
 _REDIRECTION_OPERATOR = re.compile(r"(?<=[<>])[&|]|&(?=>)")
 
