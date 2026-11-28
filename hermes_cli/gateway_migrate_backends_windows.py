@@ -23,7 +23,10 @@ from typing import Optional
 from xml.etree import ElementTree
 
 _TASK_NS = "{http://schemas.microsoft.com/windows/2004/02/mit/task}"
-_TASK_HEADER = re.compile(r"<!--\s*(\\[^>]*?)\s*-->")
+# The header text is non-blank pieces joined by blank runs; a blank run counts as header text only when more
+# text follows, so trailing blanks belong to \s* and a blank run cannot be split two ways (the old lazy
+# [^>]*? next to \s* could, which cost quadratic time on a long blank run).
+_TASK_HEADER = re.compile(r"<!--\s*(\\(?:[^>\s]|\s+(?=[^>\s]))*?)\s*-->")
 _XML_DECL = re.compile(r"<\?xml[^>]*\?>")
 _STARTUP_SUFFIXES = (".lnk", ".cmd", ".bat", ".vbs", ".ps1")
 
