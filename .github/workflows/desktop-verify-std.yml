@@ -481,7 +481,21 @@ jobs:
                     const actual = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
                     console.log('PAPER-VIEWPORT ' + mode + ' ' + scene + ' ' + size.label + ' requested ' + size.width + 'x' + size.height + ' actual ' + JSON.stringify(actual))
                     await page.screenshot({ path: `${OUT}/${theme}-${mode}-${scene}-${size.label}.png`, animations: 'disabled', caret: 'hide' })
+                    if (size.label.startsWith('desktop')) await snap(scene)
                   }
+                }
+
+                const snap = async (scene: string): Promise<void> => {
+                  // Static DOM snapshot of the real renderer: live DOM plus the CSS rules the page actually uses. For a private preview file only.
+                  const html = await page.evaluate(() => {
+                    const css = Array.from(document.styleSheets).map((sheet) => { try { return Array.from(sheet.cssRules).map((r) => r.cssText).join('\n') } catch { return '' } }).join('\n')
+                    const root = document.documentElement.cloneNode(true) as HTMLElement
+                    root.querySelectorAll('script, link[rel="stylesheet"], link[rel="modulepreload"], link[rel="preload"], style').forEach((el) => el.remove())
+                    const head = root.querySelector('head') || root.insertBefore(document.createElement('head'), root.firstChild)
+                    const st = document.createElement('style'); st.setAttribute('data-snap-css', '1'); st.textContent = css; head.appendChild(st)
+                    return '<!doctype html>' + root.outerHTML
+                  })
+                  fs.writeFileSync(`${OUT}/${theme}-${mode}-${scene}.snap.html`, html)
                 }
 
                 const send = async (text: string, done: string): Promise<void> => {
@@ -515,7 +529,14 @@ jobs:
 
                 await send('PAPER_MD please show the markdown fixture', 'END-OF-MD-FIXTURE')
                 await shotBoth('markdown')
-
+                // Diagnostic: every pre in the last code card at the narrow width, plus a real scroll attempt (computed values and scrollLeft read-back).
+                console.log('PAPER-CODE ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(async () => {
+                  const card = Array.from(document.querySelectorAll('[data-slot="code-card"]')).slice(-1)[0]
+                  if (!card) return 'no-code-card'
+                  const describe = (el: Element) => { const cs = getComputedStyle(el); return { tag: el.tagName, cls: String(el.className).slice(0, 40), ox: cs.overflowX, ws: cs.whiteSpace, sw: el.scrollWidth, cw: el.clientWidth } }
+                  const pres = Array.from(card.querySelectorAll('pre')).map((p) => { const d = describe(p); const code = p.querySelector('code'); const before = (p as HTMLElement).scrollLeft; (p as HTMLElement).scrollLeft = 1000; const after = (p as HTMLElement).scrollLeft; (p as HTMLElement).scrollLeft = before; return { ...d, code: code ? { sw: code.scrollWidth, cw: code.clientWidth } : null, scrollLeftAfterSet1000: after } })
+                  return { win: window.innerWidth, card: describe(card), pres }
+                })))
                 for (const n of [1, 2, 3]) {
                   await send(`PAPER_LONG_${n} next long reply`, `END-OF-LONG-${n}`)
                 }
@@ -544,6 +565,10 @@ jobs:
                   console.log('PAPER-SCENE ' + mode + ' settings opened')
                   await shotBoth('settings')
                   // Open dropdown menu and keyboard focus (source: ModelSelect uses a Radix select trigger, aria-label Model; model-settings.test.tsx:144 queries combobox 'Model').
+                  await fx!.app.evaluate(({ BrowserWindow }) => {
+                    BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
+                  })
+                  await page.waitForTimeout(800)
                   const modelBox = page.getByRole('combobox', { name: 'Model', exact: true })
                   await expect(modelBox).toBeVisible({ timeout: 15000 })
                   await modelBox.click()
@@ -551,6 +576,7 @@ jobs:
                   await page.waitForTimeout(500)
                   console.log('PAPER-VIEWPORT ' + mode + ' dropdown-open actual ' + JSON.stringify(await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-dropdown-open-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await snap('dropdown-open')
                   await page.keyboard.press('Escape')
                   await page.waitForTimeout(400)
                   await page.keyboard.press('Tab')
@@ -577,6 +603,7 @@ jobs:
                   await expect(warmCard).toBeVisible({ timeout: 15000 })
                   await page.waitForTimeout(800)
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-before-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await snap('selector-before')
                   const other = theme === 'paper' ? 'paper-warm' : 'paper'
                   await (other === 'paper' ? grayCard : warmCard).click()
                   await page.waitForTimeout(1200)
@@ -590,7 +617,32 @@ jobs:
                     const pick = (el: Element) => { const cs = getComputedStyle(el); return { tag: el.tagName, role: el.getAttribute('role'), label: (el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 30), border: cs.borderTopColor, borderW: cs.borderTopWidth, bg: cs.backgroundColor } }
                     return Array.from(document.querySelectorAll('input, select, [role="combobox"], textarea')).filter((el) => (el as HTMLElement).offsetParent !== null).slice(0, 8).map(pick)
                   })))
+                  console.log('PAPER-PLACEHOLDER ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
+                    // Normalise any CSS colour string to rgba (0-255, alpha 0-1) through a canvas, then composite down the ancestor chain.
+                    const cv = document.createElement('canvas'); cv.width = 1; cv.height = 1
+                    const ctx = cv.getContext('2d', { willReadFrequently: true })!
+                    const rgba = (c: string): number[] => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = '#000'; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; const a = d[3] / 255; return a === 0 ? [0, 0, 0, 0] : [Math.round(d[0] * 255 / d[3]), Math.round(d[1] * 255 / d[3]), Math.round(d[2] * 255 / d[3]), a] }
+                    const over = (fg: number[], bg: number[]): number[] => { const a = fg[3] + bg[3] * (1 - fg[3]); return a === 0 ? [0, 0, 0, 0] : [0, 1, 2].map((i) => (fg[i] * fg[3] + bg[i] * bg[3] * (1 - fg[3])) / a).concat([a]) }
+                    const lin = (v: number): number => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4) }
+                    const lum = (c: number[]): number => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+                    return Array.from(document.querySelectorAll('input, textarea')).filter((el) => (el as HTMLElement).offsetParent !== null).slice(0, 6).map((el) => {
+                      const chain: Element[] = []
+                      for (let e: Element | null = el; e; e = e.parentElement) chain.push(e)
+                      let bg = [0, 0, 0, 1]
+                      const layers: string[] = []
+                      for (const e of chain.slice().reverse()) { const cs = getComputedStyle(e); const c = rgba(cs.backgroundColor); if (c[3] > 0) { bg = over(c, bg); layers.push(e.tagName + ':' + cs.backgroundColor) } }
+                      const ops = chain.map((e) => Number(getComputedStyle(e).opacity)).filter((o) => o !== 1)
+                      const phCss = getComputedStyle(el, '::placeholder')
+                      const ph = rgba(phCss.color)
+                      const phOpacity = Number(phCss.opacity)
+                      const eff = [ph[0], ph[1], ph[2], ph[3] * phOpacity * ops.reduce((x, y) => x * y, 1)]
+                      const fg = over(eff, bg)
+                      const l1 = lum(fg); const l2 = lum(bg)
+                      return { label: (el.getAttribute('placeholder') || '').slice(0, 24), phColor: phCss.color, phOpacity, ancestorOpacities: ops, phRgba: ph.map((v) => Math.round(v * 1000) / 1000), bgRgb: bg.slice(0, 3).map((v) => Math.round(v)), bgLayers: layers, fgRgb: fg.slice(0, 3).map((v) => Math.round(v)), ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 }
+                    })
+                  })))
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-inputs-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await snap('inputs')
                   // Persistence across a real reload (boot reads the stored pick; the seed no longer overwrites it).
                   // Settings is an overlay that a reload restores from the hash route, and it covers the composer, so
                   // waitForAppReady (composer hit-test) cannot pass here. Poll the persisted theme state instead.
@@ -604,6 +656,18 @@ jobs:
                   expect(reloaded.stored).toBe(other)
                   expect(reloaded.mode).toBe(mode)
                   await page.screenshot({ path: `${OUT}/${theme}-${mode}-after-reload-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Chat readiness after reload: close Settings with Escape, then measure whether the composer is topmost. Logged, not asserted.
+                  await page.keyboard.press('Escape')
+                  await page.waitForTimeout(1500)
+                  let composerAfter: unknown = 'not measured'
+                  try {
+                    await expect.poll(() => page.evaluate(() => { const c = document.querySelector('[data-slot="composer-root"]'); if (!c) return 'no-composer'; const r = c.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return t && c.contains(t) ? 'topmost' : 'covered' }), { timeout: 30_000 }).toBe('topmost')
+                    composerAfter = 'topmost'
+                  } catch (err) {
+                    composerAfter = 'not topmost within 30s: ' + String(err).slice(0, 120)
+                  }
+                  console.log('PAPER-COMPOSER-AFTER-RELOAD ' + theme + ' ' + mode + ' ' + JSON.stringify(composerAfter))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-after-reload-closed-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
                 } else {
                   console.log('PAPER-SCENE ' + mode + ' settings button not found')
                 }
@@ -634,7 +698,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: paper-visual-screenshots
-          path: /tmp/paper-shots/*.png
+          path: |
+            /tmp/paper-shots/*.png
+            /tmp/paper-shots/*.snap.html
           if-no-files-found: warn
           retention-days: 7
 

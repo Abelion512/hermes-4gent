@@ -37,7 +37,7 @@ export function ProductRow({ listings }: { listings: Listing[] }) {
   return (
     <>
       <span
-        className="my-(--paragraph-gap) -mr-1 flex w-full snap-x snap-mandatory gap-3 overflow-x-auto pr-8 pb-1 [scrollbar-width:none]"
+        className="my-(--paragraph-gap) -mr-1 flex w-full snap-x snap-mandatory gap-5 overflow-x-auto pr-8 pb-1 [scrollbar-width:none]"
         data-slot="aui_product-row"
       >
         {listings.map(listing => (
@@ -67,7 +67,7 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: (element: 
   const spec = productSpec(listing)
 
   return (
-    <span className="not-prose flex w-44 shrink-0 snap-start flex-col gap-2" data-slot="aui_product-card">
+    <span className="not-prose flex w-48 shrink-0 snap-start flex-col gap-2.5" data-slot="aui_product-card">
       {live.length > 0 && (
         <button
           aria-label={`${t.desktop.openImage}: ${listing.address}`}
@@ -86,10 +86,16 @@ function ProductCard({ listing, onOpen }: { listing: Listing; onOpen: (element: 
         </button>
       )}
 
-      <button className="block min-w-0 cursor-pointer text-left" onClick={event => onOpen(event.currentTarget)} type="button">
+      <button
+        className="flex min-w-0 cursor-pointer flex-col gap-0.5 text-left"
+        onClick={event => onOpen(event.currentTarget)}
+        type="button"
+      >
         <span className={cn(TEXT_CLASS, 'block truncate font-medium text-foreground')}>{listing.address}</span>
         {listing.price && (
-          <span className={cn(TEXT_CLASS, 'block tabular-nums text-foreground')}>{listing.price}</span>
+          // One line, always: long producer prices wrap and bury the next
+          // card's rhythm. The full string stays in the detail popup.
+          <span className={cn(TEXT_CLASS, 'block truncate tabular-nums text-foreground')}>{listing.price}</span>
         )}
         {spec && <span className={cn(META_CLASS, 'block truncate text-muted-foreground')}>{spec}</span>}
       </button>
@@ -116,7 +122,10 @@ function ProductDetail({
 
   return (
     <DialogContent
-      bodyClassName="grid auto-rows-max grid-cols-1 content-start gap-4 overflow-y-auto sm:grid-cols-2"
+      // scroll-fade-y: clipped edges fade with scroll position, so a long
+      // detail reads as scrollable even at rest (the global Apple-style
+      // thumb only reveals on hover). Pad matches the body's p-4.
+      bodyClassName="grid auto-rows-max grid-cols-1 content-start gap-4 overflow-y-auto scroll-fade-y [--scroll-fade-pad:1rem] sm:grid-cols-2"
       className="max-h-[85vh] sm:max-w-3xl"
       onCloseAutoFocus={event => {
         event.preventDefault()
