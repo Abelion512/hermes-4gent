@@ -454,23 +454,23 @@ const PAPER_GRAY_CSS =
     '--dt-popover:color-mix(in srgb,#BDB9AF 96%,transparent) !important;' +
     '}' +
     'html.dark{' +
-    '--ui-bg-input:#2A2223;' +
-    '--ui-bg-elevated:#272021 !important;' +
-    '--dt-card:#272021 !important;' +
-    '--dt-popover:color-mix(in srgb,#272021 96%,transparent) !important;' +
+    '--ui-bg-input:#262626;' +
+    '--ui-bg-elevated:#202020 !important;' +
+    '--dt-card:#202020 !important;' +
+    '--dt-popover:color-mix(in srgb,#202020 96%,transparent) !important;' +
     '}' +
     // Element-scoped composer rules redeclare --composer-fill and beat :root.
     'html:not(.dark) [data-slot="composer-root"],html:not(.dark) [data-hud-shell] [data-slot="composer-root"],html:not(.dark) [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
     '--composer-fill:color-mix(in srgb,#BDB9AF 92%,transparent) !important;' +
     '}' +
     'html.dark [data-slot="composer-root"],html.dark [data-hud-shell] [data-slot="composer-root"],html.dark [data-slot="composer-dock"]:is(:hover,:focus-within) [data-slot="composer-root"]{' +
-    '--composer-fill:color-mix(in srgb,#322829 94%,transparent) !important;' +
+    '--composer-fill:color-mix(in srgb,#2A2A2A 94%,transparent) !important;' +
     '}' +
     // Sidebar section labels: darker accent in light (6.28:1), light accent in dark.
     'html:not(.dark) [data-slot="sidebar-group"] .group\\/section-label{color:#5A2416 !important;--theme-primary:#5A2416;}' +
     'html.dark [data-slot="sidebar-group"] .group\\/section-label{color:#D9887A !important;--theme-primary:#D9887A;}' +
     // Placeholders default to 54% alpha (4.8:1 dark, 3.5:1 light); lift to 72% dark / 70% light.
-    'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#EFE4E3 72%,transparent) !important;}' +
+    'html.dark input::placeholder,html.dark textarea::placeholder{color:color-mix(in srgb,#F0F0F0 72%,transparent) !important;}' +
     'html:not(.dark) input::placeholder,html:not(.dark) textarea::placeholder{color:color-mix(in srgb,#191816 80%,transparent) !important;}' +
     // Paper light code: darken comment, red and purple tokens for the dim code panel (Paper only).
     'html:not(.dark) .aui-shiki span[style*="#57606a"]{color:#434A52 !important;}' +
@@ -487,7 +487,7 @@ const PAPER_GRAY_CSS =
     'html.dark{--ui-stroke-primary:#7A7A7A !important;--ui-stroke-secondary:#666666 !important;--ui-stroke-tertiary:#5A5A5A !important;--ui-bg-editor:#252525 !important;}' +
     'html.dark [data-slot="code-card"]{border:1px solid var(--ui-stroke-secondary);}' +
     'html.dark .aui-md-table th{background:rgba(255,255,255,0.07) !important;}' +
-    'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 80%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#EFE4E3 68%,transparent) !important;}'
+    'html:not(.dark){--ui-text-tertiary:color-mix(in srgb,#191816 80%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#191816 80%,transparent) !important;}html.dark{--ui-text-tertiary:color-mix(in srgb,#F0F0F0 68%,transparent) !important;--color-muted-foreground:color-mix(in srgb,#F0F0F0 68%,transparent) !important;--dt-muted-foreground:color-mix(in srgb,#F0F0F0 68%,transparent) !important;}'
 
 // Paper Warm: the earlier, warmer light palette. Same structure as Paper Gray with its
 // surface, accent and code-token colors swapped; the dark rules are identical.
