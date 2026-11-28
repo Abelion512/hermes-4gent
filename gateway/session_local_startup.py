@@ -154,7 +154,7 @@ async def _prepare_joined(authority, schedule, initial):
             while not task.done():
                 try:
                     await asyncio.shield(task)
-                except asyncio.CancelledError:
+                except asyncio.CancelledError:  # NOSONAR: re-raised after the cleanup loop below
                     continue
                 except Exception:
                     logger.exception('Local recovery preparation failed while joining a cancelled build')

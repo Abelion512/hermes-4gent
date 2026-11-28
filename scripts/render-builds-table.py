@@ -452,7 +452,7 @@ def _finish_commit_build(args, parser, archive: str, block: str, names: list[str
     if args.pending_run_url:
         parser.error("A commit build has no release body to hold a builds-in-progress link")
     if args.summary_out:
-        with open(args.summary_out, "a", encoding="utf-8") as out:
+        with open(args.summary_out, "a", encoding="utf-8") as out:  # NOSONAR: summary path is workflow-set GITHUB_STEP_SUMMARY; append is intended
             out.write(f"## Commit build {args.tag}\n\n"
                       f"Builds page: {r2.public_url_for(args.r2_base_url, r2.staging_key_for(archive, 'index.html'))}\n\n"
                       + block)

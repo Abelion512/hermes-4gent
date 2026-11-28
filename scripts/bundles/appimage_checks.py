@@ -148,7 +148,7 @@ def cpu_completion(server: Path, model: Path) -> None:
         raise ValueError("wrong CPU smoke model digest")
     # A private network namespace per acceptance run: this port has no host listener.
     base = 'http://127.0.0.1:18080'
-    proc = subprocess.Popen([server, '-m', model, '--host', '127.0.0.1', '--port', '18080',
+    proc = subprocess.Popen([server, '-m', model, '--host', '127.0.0.1', '--port', '18080',  # NOSONAR: argv list, no shell; server is the tested binary
                              '--n-gpu-layers', '0', '--threads', '1', '--ctx-size', '128', '--parallel', '1'],
                             cwd=server.parent, stdin=subprocess.DEVNULL)
     try:

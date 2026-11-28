@@ -275,7 +275,7 @@ def _normalize_dashboard_cmdline(argv: list[str]) -> tuple[str, ...]:
 
 def _resolved_home(home: str) -> Path:
     try:
-        return Path(home).resolve()
+        return Path(home).resolve()  # NOSONAR: local home string; identity comparison only
     except (OSError, RuntimeError, ValueError):
         return Path(home)
 

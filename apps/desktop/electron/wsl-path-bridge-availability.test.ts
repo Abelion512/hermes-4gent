@@ -110,10 +110,10 @@ for (const [name, registry, available] of cases) {
       // Drive aliases still map to the local native path.
       assert.equal(bridge.resolveLocalReadPath('/mnt/c/Users/alex', undefined, 'local'), 'C:/Users/alex')
       assert.ok(io.probes.every(probe => !probe.startsWith('\\\\')))
-      assert.ok(io.calls.every(call => call.exe === 'reg.exe'))
+      assert.ok(io.calls.every(call => call.exe.endsWith('reg.exe')))
     }
 
-    const registryCalls = io.calls.filter(call => call.exe === 'reg.exe')
+    const registryCalls = io.calls.filter(call => call.exe.endsWith('reg.exe'))
     assert.equal(registryCalls[0].args[1], HKCU)
     assert.ok(registryCalls.length <= 2, 'availability is probed once and cached')
 
@@ -151,7 +151,7 @@ test('no WSL: the picker still maps a drive alias to its native folder', async (
   assert.equal(bridge.resolvePickerDefaultPath('/mnt/c/projects', undefined, 'local'), 'C:\\projects')
   assert.equal(bridge.resolvePickerDefaultPath('/mnt/c/projects', undefined, 'unknown'), 'C:\\projects')
   assert.equal(bridge.resolvePickerDefaultPath('/srv/project', undefined, 'local'), '/srv/project')
-  assert.ok(io.calls.every(call => call.exe === 'reg.exe'))
+  assert.ok(io.calls.every(call => call.exe.endsWith('reg.exe')))
 })
 
 test('no WSL: an unknown profile maps a drive alias whatever ran first', async () => {
@@ -173,7 +173,7 @@ test('remote profiles keep a drive alias as written in the picker', async () => 
 test('a registry read that times out is checked again after 30 s', async () => {
   const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
   const bridge = await loadBridge({ [HKCU]: timedOut() })
-  const registryCalls = () => io.calls.filter(call => call.exe === 'reg.exe').length
+  const registryCalls = () => io.calls.filter(call => call.exe.endsWith('reg.exe')).length
 
   assert.equal(bridge.resolveLocalReadPath('/home/alex', undefined, 'local'), '/home/alex')
   const firstCheck = registryCalls()
@@ -195,5 +195,5 @@ test('a missing registry key stays cached for the run', async () => {
   io.registry = { [HKCU]: registration(HKCU) }
   now.mockReturnValue(10_000_000)
   assert.equal(bridge.resolveLocalReadPath('/home/alex', undefined, 'local'), '/home/alex')
-  assert.equal(io.calls.filter(call => call.exe === 'reg.exe').length, 2)
+  assert.equal(io.calls.filter(call => call.exe.endsWith('reg.exe')).length, 2)
 })

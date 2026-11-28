@@ -33,6 +33,10 @@ let wslAvailabilityRecheckAt = 0
 // after this long instead of keeping "no WSL" for the whole run.
 const WSL_AVAILABILITY_RETRY_MS = 30_000
 
+// Resolve reg.exe from System32 instead of PATH: a writable PATH entry must not decide which
+// registry reader this bridge executes.
+const REG_EXE = `${process.env.SystemRoot || process.env.windir || 'C:\\Windows'}\\System32\\reg.exe`
+
 const LXSS_ROOTS = [
   ['HKCU', 'HKEY_CURRENT_USER'],
   ['HKLM', 'HKEY_LOCAL_MACHINE']
@@ -89,7 +93,7 @@ function isWslAvailable(): boolean {
 
   cachedWslAvailability = LXSS_ROOTS.some(root => {
     try {
-      const output = execFileSync('reg.exe', ['query', root.short, '/s'], {
+      const output = execFileSync(REG_EXE, ['query', root.short, '/s'], {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
         timeout: 1000,

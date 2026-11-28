@@ -158,7 +158,7 @@ class StatusReporter:
             return
         retry, self._retry_body = self._retry_body, None
         body = retry or await self._next_report("beat")
-        if self._goodbyes_said != goodbyes_said:
+        if self._goodbyes_said != goodbyes_said:  # NOSONAR: goodbye() can bump the counter during the awaited poll
             return  # a goodbye went out while this beat was prepared: it is superseded, and the goodbye set the next one
         outcome = await self._off_loop(
             post_report, self._target, body, timeout=_BEAT_TIMEOUT_S, opener=self._opener)

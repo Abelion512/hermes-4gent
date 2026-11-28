@@ -871,7 +871,7 @@ export class DesktopFrameMetrics {
     const days = [...new Set([
       ...peers.flatMap(peer => Object.keys(peer.days)),
       ...frameKeys(`${this.key}:report:`).map(key => key.slice(-10))
-    ])].sort()
+    ])].sort((a, b) => a.localeCompare(b))
 
     for (const day of days) {
       if (day >= utcDay(now) || day < utcDay(now - RETENTION_MS) ||

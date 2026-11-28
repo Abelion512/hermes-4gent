@@ -706,7 +706,7 @@ def _resolve_single_delivery_target(
         chat_id, thread_id, resolution_error = resolve_send_target(
             platform_key, rest, pass_unresolved_references=True)
         if resolution_error:
-            logger.warning("Invalid cron delivery target '%s': %s", deliver_value, resolution_error)
+            logger.warning("Invalid cron delivery target %r: %r", deliver_value, resolution_error)
             return None
         # Chat-only target on the origin chat adopts the origin lane where it is a durable place
         # (Telegram topic, Slack thread); Matrix/Mattermost threads are per-message ids -> top-level.
@@ -1895,7 +1895,7 @@ def _deliver_result(
         return msg
 
     for error in skipped:
-        logger.warning("Job '%s': %s", job["id"], error)
+        logger.warning("Job %r: %r", job["id"], error)
     delivery_errors = list(skipped)
     reached = 0  # targets that received the text (bot chat / room / local count when error-free)
     suppressed_targets = 0  # local: `job` is snapshotted into durable deferred records mid-loop

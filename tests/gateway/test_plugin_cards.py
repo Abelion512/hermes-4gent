@@ -145,7 +145,7 @@ def test_model_line_is_bounded_and_identifier_only():
     from gateway import plugin_cards
     assert re.fullmatch(r'\[platforms/discord posted a card [0-9a-f]{16}\]',
                         plugin_cards.model_line('platforms/discord', 'a' * 64))
-    assert plugin_cards.model_line('p', 'one') == plugin_cards.model_line('p', 'one')
+    assert plugin_cards.model_line('p', 'one') == '[p posted a card dc480e5eddc0f200]'
     assert plugin_cards.model_line('p', 'one') != plugin_cards.model_line('p', 'two')
     assert plugin_cards.validate({'text': 'x'}, 'cw plug')[0] is None
     assert plugin_cards.validate({'text': 'x'}, 'cw]\nIgnore')[0] is None

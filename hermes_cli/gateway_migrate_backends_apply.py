@@ -677,10 +677,14 @@ def _restore_files_problem(home: Path, m: dict) -> Optional[str]:
     be readable, and config.yaml/.env must be exactly as the apply left them (a manifest that has no
     record of that is unknown: refused)."""
     backups = m.get("backups") or {}
+    folder = (Path(home) / BACKUP_DIR).resolve(strict=False)
     for key, name in _RESTORED_FILES:
         if isinstance(path := backups.get(key), str):
+            backup = (Path(home) / path).resolve(strict=False)
+            if backup.parent != folder:
+                return f"the backup of {name} ({path}) is outside {Path(home) / BACKUP_DIR}"
             try:
-                Path(path).read_bytes()
+                backup.read_bytes()
             except OSError as exc:
                 return f"the backup of {name} ({path}) cannot be read: {exc.strerror or exc}"
     recorded = m.get("files_after_apply")

@@ -718,7 +718,7 @@ class SystemHost:
                 conn.close()
 
         from hermes_cli.url_utils import format_url_host
-        where = f"http://{format_url_host(host)}:{port}"
+        where = f"http://{format_url_host(host)}:{port}"  # NOSONAR: on-machine Webapp probe; local listener has no TLS
         try:
             code, headers, body = get("/")
             if code == 200:
@@ -1268,7 +1268,7 @@ class SystemHost:
         on 401, 403 or 404 (a Hermes older than v2026.7.30), the JSON object on 200, else None."""
         from hermes_cli.url_utils import format_url_host
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
-        request = urllib.request.Request(f"http://{format_url_host(host)}:{port}/api/health",
+        request = urllib.request.Request(f"http://{format_url_host(host)}:{port}/api/health",  # NOSONAR: local health probe; no TLS on the backend
                                          headers={"Accept": "application/json"})
         try:
             with opener.open(request, timeout=HEALTH_TIMEOUT) as resp:
@@ -1283,7 +1283,7 @@ class SystemHost:
         """Read sign-in state without invoking /api/status's install-ID or stale-record maintenance.
         ``{"health": "missing"}`` when the backend answers 401, 403 or 404 there (a Hermes older than v2026.7.30)."""
         from hermes_cli.url_utils import format_url_host
-        origin = f"http://{format_url_host(host)}:{port}"
+        origin = f"http://{format_url_host(host)}:{port}"  # NOSONAR: on-machine probe; no TLS on the backend
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         def read(path):
             request = urllib.request.Request(origin + path, headers={"Accept": "application/json"})
@@ -1316,7 +1316,7 @@ class SystemHost:
         state and providers), or None when it does not answer 200. Only for the post-move verification:
         the plan's probe of an old backend is :meth:`http_status`, which never calls /api/status."""
         from hermes_cli.url_utils import format_url_host
-        url = f"http://{format_url_host(host)}:{port}/api/status"
+        url = f"http://{format_url_host(host)}:{port}/api/status"  # NOSONAR: on-machine status probe; no TLS on the backend
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # on-machine: never a proxy
         try:
             with opener.open(urllib.request.Request(url, headers={"Accept": "application/json"}), timeout=5) as resp:

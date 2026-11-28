@@ -42,7 +42,7 @@ import {
 // WSL install; the no-WSL cases live in wsl-path-bridge-availability.test.ts.
 vi.mock('node:child_process', () => ({
   execFileSync: (exe: string, args: string[] = []) =>
-    exe === 'reg.exe' ? `${args[1]}\\{distribution-guid}\n    DistributionName    REG_SZ    Ubuntu\n` : 'Ubuntu\n'
+    exe.endsWith('reg.exe') ? `${args[1]}\\{distribution-guid}\n    DistributionName    REG_SZ    Ubuntu\n` : 'Ubuntu\n'
 }))
 
 // ── helpers ──────────────────────────────────────────────────────────

@@ -232,7 +232,7 @@ def check_notary_auth(
             f"App Store Connect .p8 key file does not exist: {clean_path}",
         )
     try:
-        pem_text = path.read_text(encoding="utf-8-sig")
+        pem_text = path.read_text(encoding="utf-8-sig")  # NOSONAR: path is an operator-supplied PEM; content is only validated
     except (OSError, UnicodeDecodeError) as exc:
         return PreflightResult(
             PreflightStatus.AUTH_FAILED,
