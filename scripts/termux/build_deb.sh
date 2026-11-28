@@ -80,7 +80,7 @@ if [ -n "$COMMIT_MODE" ] || [ -n "$RELEASE_COMMIT" ]; then
         export HERMES_PAYLOAD_TAG="$TAG"
         # A commit build's claim (commit.<stamp>-vX.Y.Z) keeps the commit identity: its stamp says
         # source commit-build, so the installed package refuses updates.
-        if [ "$(python3 "$HERE/deb_version.py" --channel "$TAG")" = commit ]; then
+        if [[ "$(python3 "$HERE/deb_version.py" --channel "$TAG")" = commit ]]; then
             export HERMES_BUILD_COMMIT="$COMMIT"
         else
             unset HERMES_BUILD_COMMIT
@@ -104,7 +104,7 @@ else
     COMMIT="$(git -C "$REPO_ABS" rev-parse --verify "refs/tags/$TAG^{commit}")" \
         || fail "tag $TAG not found in $REPO_ABS"
 fi
-if [ -n "$TAG" ]; then
+if [[ -n "$TAG" ]]; then
     # A release tag names its version (X.Y.Z or X.Y.Z+canary.<stamp>), with or without a pinned
     # commit: never strip the leading v, a canary tag starts with its kind.
     PY_VERSION="$(python3 "$HERE/deb_version.py" --release-version "$TAG")" \
