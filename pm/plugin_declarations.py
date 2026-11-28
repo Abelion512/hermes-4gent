@@ -540,14 +540,14 @@ def _pyproject_uv_sources(pyproject: Path | None) -> frozenset[str] | None:
     return frozenset(canonicalize_name(str(name)) for name in sources)
 
 
-def _pyproject_install_triggers(pyproject: Path | None) -> tuple[str, ...]:
+def _pyproject_install_triggers(pyproject: Path | None) -> list[str]:
     """Human-readable names of the ``pyproject.toml`` features that set ``pyproject_installs``."""
     if pyproject is None:
-        return ()
+        return []
     try:
         document = tomllib.loads(pyproject.read_text(encoding="utf-8-sig"))
     except (OSError, tomllib.TOMLDecodeError):
-        return ("pyproject.toml",)
+        return ["pyproject.toml"]
     metadata = document.get("project", {})
     uv = document.get("tool", {}).get("uv", {})
     triggers: list[str] = []
@@ -561,7 +561,7 @@ def _pyproject_install_triggers(pyproject: Path | None) -> tuple[str, ...]:
         triggers.append("[dependency-groups]")
     if uv.get("dev-dependencies"):
         triggers.append("tool.uv.dev-dependencies")
-    return tuple(triggers)
+    return triggers
 
 
 def unsatisfied_requirements(

@@ -137,6 +137,21 @@ function escapeHiddenChar(char: string): string {
       : `\\U${hex.padStart(8, '0')}`
 }
 
+/** U+2423 for each plain space at either end; a scan keeps long names linear. */
+const markEdgeSpaces = (value: string): string => {
+  let start = 0
+
+  while (value.charCodeAt(start) === 0x20) start++
+
+  let end = value.length
+
+  while (end > start && value.charCodeAt(end - 1) === 0x20) end--
+
+  return start === 0 && end === value.length
+    ? value
+    : '\u2423'.repeat(start) + value.slice(start, end) + '\u2423'.repeat(value.length - end)
+}
+
 /** The sender's sentence about a request, as the user reads it: trimmed, with hidden characters
  *  made visible. */
 const wireText = (value: unknown): string | undefined =>
@@ -151,10 +166,9 @@ const LOOKALIKE_SPACES = /(?! )[\p{Zs}\u2423]/gu
  *  shown as "␣". A name of white space only is no name. */
 const nameText = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim()
-    ? value
+    ? markEdgeSpaces(value
         .replace(HIDDEN_CHARS, escapeHiddenChar)
-        .replace(LOOKALIKE_SPACES, escapeHiddenChar)
-        .replace(/^ +| +$/g, spaces => '\u2423'.repeat(spaces.length))
+        .replace(LOOKALIKE_SPACES, escapeHiddenChar))
     : undefined
 
 /** `name` for a place that may draw a run of spaces as one blank (a system notification, a

@@ -774,9 +774,9 @@ _ONE_HOUR_WRITE_MULTIPLIER = Decimal(2)
 _WRITE_NOTE = ("cache-write pricing unavailable for route",)
 
 
-def _cache_write_buckets(usage: CanonicalUsage, entry: PricingEntry) -> tuple[tuple[Any, ...], ...]:
+def _cache_write_buckets(usage: CanonicalUsage, entry: PricingEntry) -> tuple[tuple[Any, ...], tuple[Any, ...]]:
     """``(tokens, rate, rate_above, note)`` rows for the cache writes: the 1h-tier tokens the usage
-    names at 2x input, the rest at the table's (5-minute) write rate."""
+    names at 2x input, the rest at the table's (5-minute) write rate. An unused row is zero tokens."""
     one_hour = min(dict(usage.cache_write_by_ttl).get("1h", 0), usage.cache_write_tokens)
     if one_hour and entry.source == "provider_models_api":
         rate = entry.cache_write_1h_cost_per_million or entry.cache_write_cost_per_million
@@ -784,7 +784,7 @@ def _cache_write_buckets(usage: CanonicalUsage, entry: PricingEntry) -> tuple[tu
                 (one_hour, rate, None, _WRITE_NOTE))
     if not one_hour or entry.input_cost_per_million is None:
         return ((usage.cache_write_tokens, entry.cache_write_cost_per_million,
-                 entry.cache_write_cost_per_million_above, _WRITE_NOTE),)
+                 entry.cache_write_cost_per_million_above, _WRITE_NOTE), (0, None, None, ()))
     above = entry.input_cost_per_million_above
     return (
         (usage.cache_write_tokens - one_hour, entry.cache_write_cost_per_million,

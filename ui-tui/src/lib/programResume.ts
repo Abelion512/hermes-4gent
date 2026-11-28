@@ -69,7 +69,7 @@ export function consumeProgramResumeEnv(env: NodeJS.ProcessEnv = process.env): v
   cachedToken = isValidOsc7577Token(rawToken) ? rawToken : null
 
   const trimmedPid = (rawPid ?? '').trim()
-  const parsedPid = /^[1-9][0-9]*$/.test(trimmedPid) ? Number(trimmedPid) : NaN
+  const parsedPid = /^[1-9][0-9]*$/.test(trimmedPid) ? Number(trimmedPid) : Number.NaN
   cachedOwnerPid = Number.isSafeInteger(parsedPid) && parsedPid >= 1 ? parsedPid : null
 
   cachedResumePrefix = null
