@@ -446,6 +446,9 @@ jobs:
                 await waitForAppReady(fx!, 120_000)
                 // Seed Paper before the app code of the next load runs, then reload so boot reads it.
                 await fx!.page.context().addInitScript(([t, m]) => {
+                  // Seed once per page session only, so a later in-test reload reads the persisted pick, not the seed.
+                  if (sessionStorage.getItem('paper-visual-seeded') === '1') return
+                  sessionStorage.setItem('paper-visual-seeded', '1')
                   localStorage.setItem('hermes-desktop-theme-v2', t)
                   localStorage.setItem('hermes-desktop-mode-v1', m)
                 }, [theme, mode])
@@ -518,6 +521,17 @@ jobs:
                 }
                 await shotBoth('long-chat')
 
+                // Diagnostic: where the composer fill really comes from (computed values only).
+                console.log('PAPER-COMPOSER ' + theme + ' ' + mode + ' ' + JSON.stringify(await page.evaluate(() => {
+                  const root = document.querySelector('[data-slot="composer-root"]')
+                  const surf = document.querySelector('[data-slot="composer-surface"]')
+                  const nodes = surf ? [surf, ...Array.from(surf.querySelectorAll(':scope > *')).slice(0, 4)] : []
+                  return {
+                    fill: root ? getComputedStyle(root).getPropertyValue('--composer-fill') : null,
+                    bgs: nodes.map((n) => getComputedStyle(n).backgroundColor),
+                    border: surf ? getComputedStyle(surf).borderTopColor : null
+                  }
+                })))
                 // Settings: real app UI, opened through its own button.
                 await fx!.app.evaluate(({ BrowserWindow }) => {
                   BrowserWindow.getAllWindows()[0].setBounds({ x: 0, y: 0, width: 1220, height: 800 })
@@ -529,19 +543,46 @@ jobs:
                   await page.waitForTimeout(1500)
                   console.log('PAPER-SCENE ' + mode + ' settings opened')
                   await shotBoth('settings')
-                  // Theme selector: open Appearance and show both Paper entries in the real picker.
-                  try {
-                    await page.getByText('Appearance', { exact: true }).first().click({ timeout: 5000 })
-                    await page.waitForTimeout(1200)
-                    const warm = page.getByText('Paper Warm', { exact: true }).first()
-                    const gray = page.getByText('Paper Gray', { exact: true }).first()
-                    console.log('PAPER-SELECTOR ' + theme + ' ' + mode + ' warm=' + (await warm.count()) + ' gray=' + (await gray.count()))
-                    if (await warm.count()) await warm.scrollIntoViewIfNeeded()
-                    await page.waitForTimeout(500)
-                    await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
-                  } catch (e) {
-                    console.log('PAPER-SELECTOR ' + theme + ' ' + mode + ' navigation failed: ' + String(e).slice(0, 120))
-                  }
+                  // Open dropdown menu and keyboard focus (source: ModelSelect uses a Radix select trigger, aria-label Model; model-settings.test.tsx:144 queries combobox 'Model').
+                  const modelBox = page.getByRole('combobox', { name: 'Model', exact: true })
+                  await expect(modelBox).toBeVisible({ timeout: 15000 })
+                  await modelBox.click()
+                  await expect(page.getByRole('listbox')).toBeVisible({ timeout: 15000 })
+                  await page.waitForTimeout(500)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-dropdown-open-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  await page.keyboard.press('Escape')
+                  await page.waitForTimeout(400)
+                  await page.keyboard.press('Tab')
+                  await page.waitForTimeout(400)
+                  console.log('PAPER-FOCUS ' + theme + ' ' + mode + ' active=' + (await page.evaluate(() => { const e = document.activeElement; return e ? e.tagName + ' ' + (e.getAttribute('aria-label') || e.textContent || '').slice(0, 40) : 'none' })))
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-keyboard-focus-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Theme selector: real navigation (nav items are buttons: Settings > Appearance > Theme), real selection, real persistence check. Failures fail this job; nothing is swallowed.
+                  await page.getByRole('button', { name: 'Appearance', exact: true }).click({ timeout: 15000 })
+                  await page.getByRole('button', { name: 'Theme', exact: true }).click({ timeout: 15000 })
+                  await page.getByPlaceholder(/Search your themes/).fill('Paper')
+                  const grayCard = page.getByRole('button', { name: /Paper Gray/ })
+                  const warmCard = page.getByRole('button', { name: /Paper Warm/ })
+                  await expect(grayCard).toBeVisible({ timeout: 15000 })
+                  await expect(warmCard).toBeVisible({ timeout: 15000 })
+                  await page.waitForTimeout(800)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-before-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  const other = theme === 'paper' ? 'paper-warm' : 'paper'
+                  await (other === 'paper' ? grayCard : warmCard).click()
+                  await page.waitForTimeout(1200)
+                  const after = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, stored: localStorage.getItem('hermes-desktop-theme-v2'), bodyBg: getComputedStyle(document.body).backgroundColor }))
+                  console.log('PAPER-SELECTOR ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(after))
+                  expect(after.attr).toBe(other)
+                  expect(after.stored).toBe(other)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-selector-after-pick-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
+                  // Persistence across a real reload (boot reads the stored pick; the seed no longer overwrites it).
+                  await page.reload()
+                  await waitForAppReady(fx!, 120_000)
+                  const reloaded = await page.evaluate(() => ({ attr: document.documentElement.dataset.hermesTheme, mode: document.documentElement.dataset.hermesMode, stored: localStorage.getItem('hermes-desktop-theme-v2') }))
+                  console.log('PAPER-RELOAD ' + theme + ' ' + mode + ' picked ' + other + ' -> ' + JSON.stringify(reloaded))
+                  expect(reloaded.attr).toBe(other)
+                  expect(reloaded.stored).toBe(other)
+                  expect(reloaded.mode).toBe(mode)
+                  await page.screenshot({ path: `${OUT}/${theme}-${mode}-after-reload-${other}-desktop-1220x800.png`, animations: 'disabled', caret: 'hide' })
                 } else {
                   console.log('PAPER-SCENE ' + mode + ' settings button not found')
                 }
