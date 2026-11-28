@@ -105,7 +105,7 @@ _account_stores() {
   local account suffix
   account="$(_account_home)" || return 0
   for suffix in "" ${HERMES_DATA_DIR_SUFFIX:+"$HERMES_DATA_DIR_SUFFIX"}; do
-    if [ -f "$account/.hermes$suffix/tools/facts.json" ]; then
+    if [[ -f "$account/.hermes$suffix/tools/facts.json" ]]; then
       printf '%s\n' "$account/.hermes$suffix/tools"
     fi
   done
@@ -114,7 +114,7 @@ _account_stores() {
 _which_store() {
   local store
   while IFS= read -r store; do
-    if [ "$1" -ef "$store" ]; then printf '%s\n' "$store"; return 0; fi
+    if [[ "$1" -ef "$store" ]]; then printf '%s\n' "$store"; return 0; fi
   done <<<"$2"
   return 1
 }
@@ -127,15 +127,15 @@ _which_store() {
 _resolved_path() {
   local resolved="" rest="$1" part target hops=0
   case "$rest" in /*) ;; *) resolved="$(cd -P "$REPO_ROOT" && pwd)"; resolved="${resolved%/}" ;; esac
-  while [ -n "$rest" ]; do
+  while [[ -n "$rest" ]]; do
     part="${rest%%/*}"
     case "$rest" in */*) rest="${rest#*/}" ;; *) rest="" ;; esac
     case "$part" in
       "" | .) ;;
       ..) resolved="${resolved%/*}" ;;
-      *) if [ -L "$resolved/$part" ]; then
+      *) if [[ -L "$resolved/$part" ]]; then
            hops=$((hops + 1))
-           [ "$hops" -le 40 ] || return 1
+           [[ "$hops" -le 40 ]] || return 1
            # $(...) strips every trailing newline, and BSD readlink adds none
            # to a target already ending in one: read it bare, then strip x.
            target="$(readlink -n "$resolved/$part" && printf x)" || return 1
@@ -153,7 +153,7 @@ _resolved_path() {
 # takes it, else pm's own resolver (stamps, HERMES_HOME, profiles), run by the
 # bootstrap interpreter found beside STORE; says why on stderr when it cannot.
 _pm_store() (
-  if [ -n "${HERMES_RUNTIME_DIR:-}" ]; then
+  if [[ -n "${HERMES_RUNTIME_DIR:-}" ]]; then
     _resolved_path "$HERMES_RUNTIME_DIR" && exit
     echo "error: faked HOME: HERMES_RUNTIME_DIR cannot be resolved (more than 40 symlinks, or a link readlink cannot read)" >&2
     exit 1
@@ -178,7 +178,7 @@ except Exception as error:
 _avoid_account_stores() {
   local stores target named fallback
   stores="$(_account_stores)"
-  [ -n "$stores" ] || return 0
+  [[ -n "$stores" ]] || return 0
   # Both print one newline after the path; the x keeps a path's own from $(...).
   if ! target="$(_pm_store "${stores%%$'\n'*}" && printf x)"; then
     echo "error: faked HOME: cannot check whether that is the account's tool store (${stores//$'\n'/, }); set HERMES_RUNTIME_DIR to a store of this home's own" >&2
@@ -187,7 +187,7 @@ _avoid_account_stores() {
   target="${target%$'\nx'}"
   # setup-hermes.sh stages its bootstrap uv into $HOME/.hermes/tools before pm
   # runs; when that is the account's store, point it at the one pm provisions.
-  if [ -z "${HERMES_RUNTIME_DIR:-}" ] && _which_store "$HOME/.hermes/tools" "$stores" >/dev/null; then
+  if [[ -z "${HERMES_RUNTIME_DIR:-}" ]] && _which_store "$HOME/.hermes/tools" "$stores" >/dev/null; then
     export HERMES_RUNTIME_DIR="$target"
   fi
   named="$(_which_store "$target" "$stores")" || return 0
@@ -222,7 +222,7 @@ _choose_tool_store() {
   export HERMES_RUNTIME_DIR="$account/.hermes/tools"
   # setup-hermes.sh's uv-managed bootstrap interpreter is the same kind of
   # cache, but only reused: a missing pinned minor would download into it.
-  if [ -z "${UV_PYTHON_INSTALL_DIR:-}" ] && [ -w "$account/.local/share/uv/python" ] \
+  if [[ -z "${UV_PYTHON_INSTALL_DIR:-}" ]] && [[ -w "$account/.local/share/uv/python" ]] \
       && compgen -G "$account/.local/share/uv/python/cpython-${shared#*$'\n'}[.-]*" >/dev/null; then
     export UV_PYTHON_INSTALL_DIR="$account/.local/share/uv/python"
   fi

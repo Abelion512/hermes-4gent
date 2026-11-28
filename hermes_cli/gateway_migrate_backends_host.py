@@ -30,7 +30,7 @@ from typing import Optional
 
 from hermes_cli import gateway_migrate_backends_timeouts as _timeouts
 
-_ENV_FILE_ENTRY = re.compile(r"(\S+) \(ignore_errors=(yes|no)\)")
+_ENV_FILE_ENTRY = re.compile(r"(\S++) \(ignore_errors=(yes|no)\)")
 logger = logging.getLogger(__name__)
 
 _SHOW_PROPS = ("MainPID", "ActiveState", "UnitFileState", "FragmentPath", "ExecStart", "ControlGroup",

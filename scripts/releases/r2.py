@@ -1144,7 +1144,7 @@ def package_filename(stanza: str) -> str:
     for line in stanza.splitlines():
         if line.startswith((" ", "\t")) and previous not in ("", "package", "filename"):
             continue  # Description and other multiline fields do not identify the artifact.
-        match = re.fullmatch(r"([A-Za-z][A-Za-z0-9-]*):[ \t]*(.*)", line)
+        match = re.fullmatch(r"([A-Za-z][A-Za-z0-9-]*+):[ \t]*+(.*)", line)
         if match is None or match[1].lower() in fields:
             raise ValueError("Malformed or duplicate APT field")
         previous = match[1].lower()

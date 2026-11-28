@@ -137,6 +137,21 @@ function escapeHiddenChar(char: string): string {
       : `\\U${hex.padStart(8, '0')}`
 }
 
+/** U+2423 for each plain space at either end; a scan keeps long names linear. */
+const markEdgeSpaces = (value: string): string => {
+  let start = 0
+
+  while (value.charCodeAt(start) === 0x20) start++
+
+  let end = value.length
+
+  while (end > start && value.charCodeAt(end - 1) === 0x20) end--
+
+  return start === 0 && end === value.length
+    ? value
+    : '\u2423'.repeat(start) + value.slice(start, end) + '\u2423'.repeat(value.length - end)
+}
+
 /** The sender's sentence about a request, as the user reads it: trimmed, with hidden characters
  *  made visible. */
 const wireText = (value: unknown): string | undefined =>
@@ -149,23 +164,12 @@ const LOOKALIKE_SPACES = /(?! )[\p{Zs}\u2423]/gu
 /** A folder, a site or a site's label as the user reads it: the name whole, so that two names
  *  that differ only in spacing never read the same. Nothing is trimmed; a space at either end is
  *  shown as "␣". A name of white space only is no name. */
-const nameText = (value: unknown): string | undefined => {
-  if (typeof value !== 'string' || !value.trim()) {
-    return undefined
-  }
-  const escaped = value.replace(HIDDEN_CHARS, escapeHiddenChar).replace(LOOKALIKE_SPACES, escapeHiddenChar)
-  // The edge runs are counted by index walks, not a / +$/ pattern: an unanchored trailing pattern
-  // retries from each position of a long inner run, which degrades to quadratic time.
-  let lead = 0
-  while (escaped.charCodeAt(lead) === 32) {
-    lead++
-  }
-  let end = escaped.length
-  while (end > lead && escaped.charCodeAt(end - 1) === 32) {
-    end--
-  }
-  return '\u2423'.repeat(lead) + escaped.slice(lead, end) + '\u2423'.repeat(escaped.length - end)
-}
+const nameText = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim()
+    ? markEdgeSpaces(value
+        .replace(HIDDEN_CHARS, escapeHiddenChar)
+        .replace(LOOKALIKE_SPACES, escapeHiddenChar))
+    : undefined
 
 /** `name` for a place that may draw a run of spaces as one blank (a system notification, a
  *  toast): each space after the first of a run becomes a no-break space, which is always drawn. */

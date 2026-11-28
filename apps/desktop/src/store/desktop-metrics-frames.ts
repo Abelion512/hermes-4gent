@@ -160,10 +160,10 @@ export class DesktopFrameMetrics {
     this.journal = { days: {}, epoch: captured.epoch, maxSpanMs: 0, revision: 0, since: null, updatedAt: Date.now() }
 
     if (pending) {
-      void DesktopFrameMetrics.purge(stateKey, captured)
+      void DesktopFrameMetrics.purge(stateKey, captured) // NOSONAR: purge catches coordination failure internally; ready gates later work
     }
 
-    this.ready = metricsPhase(() => {
+    this.ready = metricsPhase(() => { // NOSONAR: async init is exposed as ready; flush and consent gates await it
       try {
         DesktopFrameMetrics.repairOutgoingOwned(stateKey)
         const stored = readJson<ScopeState>(this.key)

@@ -18,7 +18,7 @@ DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 # and Vertex express mode (#115306), so an express key reaches aiplatform only via this base config.
 VERTEX_EXPRESS_BASE_URL = "https://aiplatform.googleapis.com/v1beta1/publishers/google"
 
-_API_VERSION_SEGMENT = re.compile(r"^v\d+(?:alpha|beta)?\d*$", re.IGNORECASE)
+_API_VERSION_SEGMENT = re.compile(r"^v\d++(?:(?:alpha|beta)\d*)?$", re.IGNORECASE)
 
 
 def is_vertex_express_base_url(base_url: str) -> bool:
