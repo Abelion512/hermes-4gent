@@ -15,6 +15,24 @@ import {
 
 const tempDirs: string[] = []
 
+const jsUnsafeCharMap: Record<string, string> = {
+  '<': '\\u003C',
+  '>': '\\u003E',
+  '/': '\\u002F',
+  '\\': '\\\\',
+  '\b': '\\b',
+  '\f': '\\f',
+  '\n': '\\n',
+  '\r': '\\r',
+  '\t': '\\t',
+  '\0': '\\0',
+  '\u2028': '\\u2028',
+  '\u2029': '\\u2029'
+}
+
+const escapeUnsafeJsChars = (value: string): string =>
+  value.replace(/[<>/\\\b\f\n\r\t\0\u2028\u2029]/g, ch => jsUnsafeCharMap[ch] ?? ch)
+
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { force: true, recursive: true })
@@ -333,7 +351,7 @@ test.skipIf(process.platform === 'win32')('xcode-select probe enforces its timeo
     makeExecutable(
       path.join(dir, name),
       `#!/usr/bin/env bash\nexec ${JSON.stringify(process.execPath)} -e ${JSON.stringify(
-        `setTimeout(() => console.log(${JSON.stringify(devDir)}), ${delayMs})`
+        `setTimeout(() => console.log(${escapeUnsafeJsChars(JSON.stringify(devDir))}), ${delayMs})`
       )}\n`
     )
 
