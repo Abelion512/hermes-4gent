@@ -149,14 +149,23 @@ const LOOKALIKE_SPACES = /(?! )[\p{Zs}\u2423]/gu
 /** A folder, a site or a site's label as the user reads it: the name whole, so that two names
  *  that differ only in spacing never read the same. Nothing is trimmed; a space at either end is
  *  shown as "␣". A name of white space only is no name. */
-const nameText = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim()
-    ? value
-        .replace(HIDDEN_CHARS, escapeHiddenChar)
-        .replace(LOOKALIKE_SPACES, escapeHiddenChar)
-        .replace(/^ +/, spaces => '\u2423'.repeat(spaces.length))
-        .replace(/ +$/, spaces => '\u2423'.repeat(spaces.length))
-    : undefined
+const nameText = (value: unknown): string | undefined => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return undefined
+  }
+  const escaped = value.replace(HIDDEN_CHARS, escapeHiddenChar).replace(LOOKALIKE_SPACES, escapeHiddenChar)
+  // The edge runs are counted by index walks, not a / +$/ pattern: an unanchored trailing pattern
+  // retries from each position of a long inner run, which degrades to quadratic time.
+  let lead = 0
+  while (escaped.charCodeAt(lead) === 32) {
+    lead++
+  }
+  let end = escaped.length
+  while (end > lead && escaped.charCodeAt(end - 1) === 32) {
+    end--
+  }
+  return '\u2423'.repeat(lead) + escaped.slice(lead, end) + '\u2423'.repeat(escaped.length - end)
+}
 
 /** `name` for a place that may draw a run of spaces as one blank (a system notification, a
  *  toast): each space after the first of a run becomes a no-break space, which is always drawn. */
