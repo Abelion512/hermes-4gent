@@ -418,6 +418,22 @@ def _allowed_profile_roots() -> tuple[Path, ...]:
     return tuple(roots)
 
 
+def _sanitize_profile_path_input(path: str | Path) -> str:
+    """Return a validated path string suitable for Path(...), or raise ValueError."""
+    if not isinstance(path, (str, os.PathLike)):
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    try:
+        raw = os.fspath(path)
+    except (TypeError, ValueError, OSError, RuntimeError):
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    if not isinstance(raw, str) or not raw.strip() or "\x00" in raw:
+        _refuse_profile_path("unreadable path")
+        raise ValueError("unreadable path")
+    return raw
+
+
 def _confined_profile_path(path: str | Path) -> Path:
     """Resolve *path* only when it stays inside an allowlisted Hermes tree.
 
@@ -425,7 +441,8 @@ def _confined_profile_path(path: str | Path) -> Path:
     routes share ``ValueError``; predicates map it to False and never try a broader path.
     """
     try:
-        candidate = Path(os.fspath(path)).expanduser()
+        raw = _sanitize_profile_path_input(path)
+        candidate = Path(raw).expanduser()
     except (TypeError, ValueError, OSError, RuntimeError):
         _refuse_profile_path("unreadable path")
         raise ValueError("unreadable path")
